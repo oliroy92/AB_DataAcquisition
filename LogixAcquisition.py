@@ -7,8 +7,7 @@ import numpy as np
 from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
 from matplotlib.figure import Figure
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, 
-                            QApplication, QSizePolicy, QInputDialog, QLineEdit, QLabel, QWidget
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QApplication, QSizePolicy, QInputDialog, QLineEdit, QLabel, QWidget
 from PyQt5 import QtGui, QtCore
 
 global ipAddress
@@ -30,8 +29,8 @@ class Popup(QWidget):
         IPtextbox = QLineEdit(self)
 
         #text, okPressed = QInputDialog.getText(self, "Configuration","IP Address:", QLineEdit.Normal, "")
-        if okPressed and text != '':
-            ipAddress = text
+        #if okPressed and text != '':
+        #    ipAddress = text
 
 
 class MainWindow(QWidget):
@@ -45,11 +44,11 @@ class MainWindow(QWidget):
         Record = 0
 
         # Create Buttons
-        PauseButton = _createButton('pause-icon.png','Press to pause',35)
-        PlayButton = _createButton('play-icon.png','Press to play',35)
-        SettingsButton = _createButton('settings-icon.png','Press to go into settings',35)
-        BackwardButton = _createButton('backward-icon.png','Press to go backward in time',35)
-        ForwardButton = _createButton('forward-icon.png','Press to go forward in time',35)
+        PauseButton = _createButton('images/pause-icon.png','Press to pause',35)
+        PlayButton = _createButton('images/play-icon.png','Press to play',35)
+        SettingsButton = _createButton('images/settings-icon.png','Press to go into settings',35)
+        BackwardButton = _createButton('images/backward-icon.png','Press to go backward in time',35)
+        ForwardButton = _createButton('images/forward-icon.png','Press to go forward in time',35)
 
         PauseButton.clicked.connect(self._pause_Clicked)
         PlayButton.clicked.connect(self._play_Clicked)

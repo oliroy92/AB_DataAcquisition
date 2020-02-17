@@ -7,10 +7,12 @@ import numpy as np
 from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
 from matplotlib.figure import Figure
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QApplication, QSizePolicy, QInputDialog, QLineEdit, QLabel, QWidget
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QGridLayout
+from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QSizePolicy, QInputDialog, QLineEdit, QLabel
 from PyQt5 import QtGui, QtCore
 
-global ipAddress
+global ipAddress 
+ipAddress = "0.0.0.0"
 
 class Popup(QWidget):
     def __init__(self):
@@ -19,19 +21,25 @@ class Popup(QWidget):
 
     def initUI(self):
         self.setWindowTitle('Configuration')
-        self.setFixedSize = (150,150)
-        self.move(150,150)
 
-        # define widgets
-        applyButton = QPushButton("Apply")
+        IPlabel = QLabel("Enter PLC IP Address:", self)
+        IPlabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
+        IPlabel.move(10,5)
+
+        self.IPtextbox = QLineEdit(self)
+        self.IPtextbox.setGeometry(10,35,150,20)
+        self.IPtextbox.setFont(QtGui.QFont("Arial",12))
+
+        applyButton = QPushButton("Apply",self)
         applyButton.setToolTip('Press to apply changes')
-        IPlabel = QLabel("Enter PLC IP Address:")
-        IPtextbox = QLineEdit(self)
+        applyButton.clicked.connect(self.setIP)
+        applyButton.move(10,60)
 
-        #text, okPressed = QInputDialog.getText(self, "Configuration","IP Address:", QLineEdit.Normal, "")
-        #if okPressed and text != '':
-        #    ipAddress = text
-
+    def setIP(self):
+        global ipAddress
+        if self.IPtextbox.text() != ipAddress:
+            ipAddress = self.IPtextbox.text()
+            print(ipAddress)
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -52,14 +60,14 @@ class MainWindow(QWidget):
 
         PauseButton.clicked.connect(self._pause_Clicked)
         PlayButton.clicked.connect(self._play_Clicked)
-        SettingsButton.clicked.connect(self._settings_Clicked)
+        SettingsButton.clicked.connect(self.buildPopup)
         BackwardButton.clicked.connect(self._backward_Clicked)
         ForwardButton.clicked.connect(self._forward_Clicked)
 
         # Layout of GUI
         grid = QGridLayout()
-        grid.setColumnMinimumWidth(0,1000)
-        grid.setRowMinimumHeight(0, 1000)
+        grid.setColumnMinimumWidth(0,500)
+        grid.setRowMinimumHeight(0, 500)
 
         # Buttons layout
         ButtonLayout = QVBoxLayout()
@@ -74,19 +82,38 @@ class MainWindow(QWidget):
         ButtonLayout.addWidget(ForwardButton)   
         ButtonLayout.addWidget(SettingsButton)
 
+        # Header layout
+        HeaderLayout = QHBoxLayout()
+        header_widget = QWidget()
+        header_widget.setLayout(HeaderLayout)
+        header_widget.setFixedHeight(100)
 
+        # Graph layout
+        GraphLayout = QVBoxLayout()
+        graph_widget = QWidget()
+        graph_widget.setLayout(GraphLayout)
+     
         # Create canvas
         dynamic_canvas = FigureCanvas(Figure(figsize=(5, 3)))
         
         # Add widgets to GUI
-        grid.addWidget(dynamic_canvas,0,0)
-        grid.addWidget(button_widget,0,1)
+        GraphLayout.addWidget(dynamic_canvas)
+        grid.addWidget(header_widget,0,0)
+        grid.addWidget(graph_widget,1,0)
+        grid.addWidget(button_widget,1,1)
         
         # Set layout to main window
         self.setLayout(grid)
+
+        # Update Plot
         self._dynamic_ax = dynamic_canvas.figure.subplots()
         self._timer = dynamic_canvas.new_timer(100, [(self._update_canvas, (), {})])
         self._timer.start()
+
+    def buildPopup(self):
+        self.popup_window = Popup()
+        self.popup_window.setGeometry(100,100,400,200)
+        self.popup_window.show()
 
     def _update_canvas(self):
         self._dynamic_ax.clear()
@@ -100,9 +127,6 @@ class MainWindow(QWidget):
 
     def _pause_Clicked(self):
         print("pause")
-
-    def _settings_Clicked(self):
-        Popup()
 
     def _backward_Clicked(self):
         print("Backward")

@@ -10,6 +10,7 @@ from matplotlib.figure import Figure
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QGridLayout
 from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QSizePolicy, QInputDialog, QLineEdit, QLabel
 from PyQt5 import QtGui, QtCore
+from PyQt5.QtGui import QPixmap
 
 global ipAddress 
 ipAddress = "0.0.0.0"
@@ -22,18 +23,35 @@ class Popup(QWidget):
     def initUI(self):
         self.setWindowTitle('Configuration')
 
-        IPlabel = QLabel("Enter PLC IP Address:", self)
-        IPlabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
-        IPlabel.move(10,5)
+        CurrentIPlabel = QLabel("Current PLC IP Address:")
+        CurrentIPlabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
+        CurrentIP = QLabel(ipAddress)
+        CurrentIP.setFont(QtGui.QFont("Arial", 12))
 
-        self.IPtextbox = QLineEdit(self)
+        EnterIPlabel = QLabel("Enter PLC IP Address:")
+        EnterIPlabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
+
+        self.IPtextbox = QLineEdit()
         self.IPtextbox.setGeometry(10,35,150,20)
         self.IPtextbox.setFont(QtGui.QFont("Arial",12))
 
-        applyButton = QPushButton("Apply",self)
+        applyButton = QPushButton("Apply")
         applyButton.setToolTip('Press to apply changes')
         applyButton.clicked.connect(self.setIP)
         applyButton.move(10,60)
+
+        # Popup layout
+        grid = QGridLayout()
+        grid.setSpacing(10)
+
+        grid.addWidget(CurrentIPlabel,0,0)
+        grid.addWidget(EnterIPlabel,1,0)
+        grid.addWidget(CurrentIP,0,1)
+        grid.addWidget(self.IPtextbox,1,1)
+        grid.addWidget(applyButton,2,1)
+
+        self.setGeometry(600,600,400,100)
+        self.setLayout(grid)
 
     def setIP(self):
         global ipAddress
@@ -47,9 +65,7 @@ class MainWindow(QWidget):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle('PyLogix Data Acquisition')  
-
-        Record = 0
+        self.setWindowTitle('PyLogix Data Acquisition')   
 
         # Create Buttons
         PauseButton = _createButton('images/pause-icon.png','Press to pause',35)
@@ -58,6 +74,7 @@ class MainWindow(QWidget):
         BackwardButton = _createButton('images/backward-icon.png','Press to go backward in time',35)
         ForwardButton = _createButton('images/forward-icon.png','Press to go forward in time',35)
 
+        # What to do if buttons are clicked
         PauseButton.clicked.connect(self._pause_Clicked)
         PlayButton.clicked.connect(self._play_Clicked)
         SettingsButton.clicked.connect(self.buildPopup)
@@ -66,16 +83,14 @@ class MainWindow(QWidget):
 
         # Layout of GUI
         grid = QGridLayout()
-        grid.setColumnMinimumWidth(0,500)
-        grid.setRowMinimumHeight(0, 500)
+        grid.setVerticalSpacing(5)
 
-        # Buttons layout
+        # Button layout
         ButtonLayout = QVBoxLayout()
         button_widget = QWidget()
         button_widget.setLayout(ButtonLayout)
         button_widget.setFixedWidth(100)
 
-        # Add Buttons to button layout
         ButtonLayout.addWidget(BackwardButton) 
         ButtonLayout.addWidget(PlayButton)
         ButtonLayout.addWidget(PauseButton)
@@ -83,10 +98,19 @@ class MainWindow(QWidget):
         ButtonLayout.addWidget(SettingsButton)
 
         # Header layout
+        HeaderLogo = QLabel()
+        HeaderLogo.setPixmap(QPixmap('images/logo.jpg').scaled(150, 75, QtCore.Qt.KeepAspectRatio, QtCore.Qt.FastTransformation))
+
+        HeaderTitle = QLabel('Title',self)
+        HeaderTitle.setFont(QtGui.QFont("Arial",36))
+        
         HeaderLayout = QHBoxLayout()
+        HeaderLayout.addWidget(HeaderLogo)
+        HeaderLayout.addWidget(HeaderTitle)
+
         header_widget = QWidget()
         header_widget.setLayout(HeaderLayout)
-        header_widget.setFixedHeight(100)
+        header_widget.setFixedHeight(75)
 
         # Graph layout
         GraphLayout = QVBoxLayout()
@@ -95,9 +119,9 @@ class MainWindow(QWidget):
      
         # Create canvas
         dynamic_canvas = FigureCanvas(Figure(figsize=(5, 3)))
-        
-        # Add widgets to GUI
         GraphLayout.addWidget(dynamic_canvas)
+
+        # Add widgets to GUI
         grid.addWidget(header_widget,0,0)
         grid.addWidget(graph_widget,1,0)
         grid.addWidget(button_widget,1,1)
@@ -112,7 +136,6 @@ class MainWindow(QWidget):
 
     def buildPopup(self):
         self.popup_window = Popup()
-        self.popup_window.setGeometry(100,100,400,200)
         self.popup_window.show()
 
     def _update_canvas(self):
@@ -123,7 +146,7 @@ class MainWindow(QWidget):
         self._dynamic_ax.figure.canvas.draw()
 
     def _play_Clicked(self):
-        print("play")
+        print(_getLogixData(self))
 
     def _pause_Clicked(self):
         print("pause")
@@ -134,11 +157,10 @@ class MainWindow(QWidget):
     def _forward_Clicked(self):
         print("Forward")
 
-def _getLogixData(ipAddress):
+def _getLogixData(self):
     tag_list = [ 'LogixData1', 'LogixDataUnit1', 'LogixData2', 'LogixDataUnit2', 'LogixData3', 'LogixDataUnit3',
                  'LogixData4', 'LogixDataUnit4', 'LogixData5', 'LogixDataUnit5' ]
     with PLC() as comm:
-        comm = PLC()
         comm.IPAddress = ipAddress
         ret = comm.Read(tag_list)
     return ret

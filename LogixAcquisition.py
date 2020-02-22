@@ -4,16 +4,19 @@ import time
 from pylogix import PLC
 
 import numpy as np
-from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
-from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QGridLayout
-from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QSizePolicy, QInputDialog, QLineEdit, QLabel
+from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QSizePolicy, QInputDialog, QLineEdit, QLabel, QComboBox
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtGui import QPixmap
 
 global ipAddress 
+global refreshTime
 ipAddress = "0.0.0.0"
+refreshTime = "1"
 
 class Popup(QWidget):
     def __init__(self):
@@ -22,6 +25,7 @@ class Popup(QWidget):
 
     def initUI(self):
         self.setWindowTitle('Configuration')
+        self.setFixedSize(600,400)
 
         CurrentIPlabel = QLabel("Current PLC IP Address:")
         CurrentIPlabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
@@ -35,44 +39,68 @@ class Popup(QWidget):
         self.IPtextbox.setGeometry(10,35,150,20)
         self.IPtextbox.setFont(QtGui.QFont("Arial",12))
 
-        applyButton = QPushButton("Apply")
-        applyButton.setToolTip('Press to apply changes')
-        applyButton.clicked.connect(self.setIP)
-        applyButton.move(10,60)
+        CurrentRefTimeLabel = QLabel("Current refresh time:")
+        CurrentRefTimeLabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
+        CurrentRefTime = QLabel(str(refreshTime)+" sec")
+        CurrentRefTime.setFont(QtGui.QFont("Arial", 12))
+
+        RefreshTimeLabel = QLabel("New refresh time (sec):")
+        RefreshTimeLabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
+
+        self.TimeComboBox = QComboBox()
+        Items = ["0.5","1","2","5","10","30","60","120","300","600"]
+        self.TimeComboBox.addItems(Items)
+        self.TimeComboBox.setFixedHeight(35)
+        self.TimeComboBox.setFont(QtGui.QFont("Arial", 10))
+
+        applyButton = createButton("Apply", "Press to apply changes", 12)
+        applyButton.clicked.connect(self.ApplyChanges)
 
         # Popup layout
         grid = QGridLayout()
-        grid.setSpacing(10)
+        grid.setVerticalSpacing(50)
+        grid.setHorizontalSpacing(20)
 
         grid.addWidget(CurrentIPlabel,0,0)
-        grid.addWidget(EnterIPlabel,1,0)
         grid.addWidget(CurrentIP,0,1)
+        grid.addWidget(EnterIPlabel,1,0)
         grid.addWidget(self.IPtextbox,1,1)
-        grid.addWidget(applyButton,2,1)
+        grid.addWidget(CurrentRefTimeLabel,2,0)
+        grid.addWidget(CurrentRefTime,2,1)
+        grid.addWidget(RefreshTimeLabel,3,0)
+        grid.addWidget(self.TimeComboBox,3,1)
+        grid.addWidget(applyButton,4,1)
 
         self.setGeometry(600,600,400,100)
         self.setLayout(grid)
 
-    def setIP(self):
+    def ApplyChanges(self):
         global ipAddress
+        global refreshTime
+
         if self.IPtextbox.text() != ipAddress:
             ipAddress = self.IPtextbox.text()
-            print(ipAddress)
+
+        if self.TimeComboBox.currentText() != refreshTime:
+            refreshTime = self.TimeComboBox.currentText()
+            print(refreshTime)
 
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
+        self.displayedPlot = 1
         self.initUI()
 
     def initUI(self):
         self.setWindowTitle('PyLogix Data Acquisition')   
 
         # Create Buttons
-        PauseButton = _createButton('images/pause-icon.png','Press to pause',35)
-        PlayButton = _createButton('images/play-icon.png','Press to play',35)
-        SettingsButton = _createButton('images/settings-icon.png','Press to go into settings',35)
-        BackwardButton = _createButton('images/backward-icon.png','Press to go backward in time',35)
-        ForwardButton = _createButton('images/forward-icon.png','Press to go forward in time',35)
+        PauseButton = createIconButton('images/pause-icon.png','Press to pause',35)
+        PlayButton = createIconButton('images/play-icon.png','Press to play',35)
+        SettingsButton = createIconButton('images/settings-icon.png','Press to go into settings',35)
+        BackwardButton = createIconButton('images/backward-icon.png','Press to go backward in time',35)
+        ForwardButton = createIconButton('images/forward-icon.png','Press to go forward in time',35)
+        NextPlotButton = createButton("Next Plot", "Press to display next plot", 16)
 
         # What to do if buttons are clicked
         PauseButton.clicked.connect(self._pause_Clicked)
@@ -80,6 +108,7 @@ class MainWindow(QWidget):
         SettingsButton.clicked.connect(self.buildPopup)
         BackwardButton.clicked.connect(self._backward_Clicked)
         ForwardButton.clicked.connect(self._forward_Clicked)
+        NextPlotButton.clicked.connect(self._nextPlot)
 
         # Layout of GUI
         grid = QGridLayout()
@@ -112,14 +141,18 @@ class MainWindow(QWidget):
         header_widget.setLayout(HeaderLayout)
         header_widget.setFixedHeight(75)
 
+        # Create figure for plotting
+        self.fig = plt.figure(figsize=(5, 3))
+        self.canvas = FigureCanvas(self.fig)
+        ax = self.fig.add_subplot(1,1,1)
+        xs = []
+        ys = []
+
         # Graph layout
         GraphLayout = QVBoxLayout()
+        GraphLayout.addWidget(self.canvas)
         graph_widget = QWidget()
         graph_widget.setLayout(GraphLayout)
-     
-        # Create canvas
-        dynamic_canvas = FigureCanvas(Figure(figsize=(5, 3)))
-        GraphLayout.addWidget(dynamic_canvas)
 
         # Add widgets to GUI
         grid.addWidget(header_widget,0,0)
@@ -129,21 +162,51 @@ class MainWindow(QWidget):
         # Set layout to main window
         self.setLayout(grid)
 
-        # Update Plot
-        self._dynamic_ax = dynamic_canvas.figure.subplots()
-        self._timer = dynamic_canvas.new_timer(100, [(self._update_canvas, (), {})])
-        self._timer.start()
+        
+
+        # Establish communication with PLC
+        if ipAddress == "0.0.0.0":
+            DiscoverPLC()
+        else:
+            _update_graph(self)
+
+    def _nextPlot(self):
+        self.displayedPlot = displayedPlot + 1
+        if displayedPlot > 5:
+            displayedPlot = 1
 
     def buildPopup(self):
         self.popup_window = Popup()
         self.popup_window.show()
 
-    def _update_canvas(self):
-        self._dynamic_ax.clear()
-        t = np.linspace(0, 10, 101)
-        # Shift the sinusoid as a function of time.
-        self._dynamic_ax.plot(t, np.sin(t + time.time()))
-        self._dynamic_ax.figure.canvas.draw()
+    def _update_graph(self):
+        ani = animation.FuncAnimation(fig, animate, fargs=(xs, ys), interval=1000)
+        plt.show()
+    
+    def animate(i, xs, ys):
+
+        dataToRead = displayedPlot - 1
+        # Read temperature (Celsius) from TMP102
+        newdata, dataNames, dataUnits = getLogixData()
+        newtime = getPLCtime()
+
+        # Add x and y to lists
+        xs.append(newtime)
+        ys.append(newdata[dataToRead])
+
+        # Limit x and y lists to 20 items
+        xs = xs[-30:]
+        ys = ys[-30:]
+
+        # Draw x and y lists
+        ax.clear()
+        ax.plot(xs, ys)
+
+        # Format plot
+        plt.xticks(rotation=45, ha='right')
+        plt.subplots_adjust(bottom=0.30)
+        plt.title('Graph of ' + dataNames[dataToRead] + " from " + xs[0] + " to " + xs[29])
+        plt.ylabel(dataNames[dataToRead])    
 
     def _play_Clicked(self):
         print(_getLogixData(self))
@@ -157,21 +220,50 @@ class MainWindow(QWidget):
     def _forward_Clicked(self):
         print("Forward")
 
-def _getLogixData(self):
-    tag_list = [ 'LogixData1', 'LogixDataUnit1', 'LogixData2', 'LogixDataUnit2', 'LogixData3', 'LogixDataUnit3',
-                 'LogixData4', 'LogixDataUnit4', 'LogixData5', 'LogixDataUnit5' ]
+def getPLCtime():
+    with PLC() as comm:
+        ret = comm.GetPLCTime()
+    return ret
+
+def DiscoverPLC():
+    with PLC() as comm:
+        devices = comm.Discover()
+        for device in devices.value:
+            if device.DeviceType == 'Programmable Logic Controller':
+                if ipAddress != device.IPAddress:
+                    ipAddress = device.IPAddress
+                    with PLC() as comm:
+                        comm.IPAddress = ipAddress
+                    print("PLC found! IP address configured")
+                    return
+
+def getLogixData():
+    # gets data from the PLC at the entered ipAdress.
+    tag_list = [ 'LogixData1',  'LogixData2','LogixData3','LogixData4','LogixData5','LogixDataName1','LogixDataName2','LogixDataName3','LogixDataName4','LogixDataName5'
+                    ,'LogixDataUnit1','LogixDataUnit2', 'LogixDataUnit3','LogixDataUnit4','LogixDataUnit5']
     with PLC() as comm:
         comm.IPAddress = ipAddress
         ret = comm.Read(tag_list)
-    return ret
+        data = ret[0:4]
+        dataName = ret[5:9] 
+        dataUnit = ret[10:14]
 
-def _createButton(iconStr, toolTipStr, iconSize):
+    return data, dataName, dataUnit 
+
+def createIconButton(iconStr, toolTipStr, iconSize):
     button = QPushButton("")
     button.setToolTip(toolTipStr)
     button.setIcon(QtGui.QIcon(iconStr))
     button.setIconSize(QtCore.QSize(iconSize,iconSize))
     button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     return button
+
+def createButton(text, toolTipStr, textsize):
+    button = QPushButton(text)
+    button.setFont(QtGui.QFont("Arial", textsize, QtGui.QFont.Bold))
+    button.setToolTip(toolTipStr)
+    return button
+
 
 if __name__ == "__main__":
     qapp = QApplication(sys.argv)

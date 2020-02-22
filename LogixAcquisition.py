@@ -29,8 +29,8 @@ class Popup(QWidget):
 
         CurrentIPlabel = QLabel("Current PLC IP Address:")
         CurrentIPlabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
-        CurrentIP = QLabel(ipAddress)
-        CurrentIP.setFont(QtGui.QFont("Arial", 12))
+        self.CurrentIP = QLabel(ipAddress)
+        self.CurrentIP.setFont(QtGui.QFont("Arial", 12))
 
         EnterIPlabel = QLabel("Enter PLC IP Address:")
         EnterIPlabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
@@ -41,8 +41,8 @@ class Popup(QWidget):
 
         CurrentRefTimeLabel = QLabel("Current refresh time:")
         CurrentRefTimeLabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
-        CurrentRefTime = QLabel(str(refreshTime)+" sec")
-        CurrentRefTime.setFont(QtGui.QFont("Arial", 12))
+        self.CurrentRefTime = QLabel(str(refreshTime)+" sec")
+        self.CurrentRefTime.setFont(QtGui.QFont("Arial", 12))
 
         RefreshTimeLabel = QLabel("New refresh time (sec):")
         RefreshTimeLabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
@@ -62,11 +62,11 @@ class Popup(QWidget):
         grid.setHorizontalSpacing(20)
 
         grid.addWidget(CurrentIPlabel,0,0)
-        grid.addWidget(CurrentIP,0,1)
+        grid.addWidget(self.CurrentIP,0,1)
         grid.addWidget(EnterIPlabel,1,0)
         grid.addWidget(self.IPtextbox,1,1)
         grid.addWidget(CurrentRefTimeLabel,2,0)
-        grid.addWidget(CurrentRefTime,2,1)
+        grid.addWidget(self.CurrentRefTime,2,1)
         grid.addWidget(RefreshTimeLabel,3,0)
         grid.addWidget(self.TimeComboBox,3,1)
         grid.addWidget(applyButton,4,1)
@@ -79,11 +79,17 @@ class Popup(QWidget):
         global refreshTime
 
         if self.IPtextbox.text() != ipAddress:
-            ipAddress = self.IPtextbox.text()
+            splitIP = self.IPtextbox.text().split(".")
+            splitIP = [i for i in splitIP if i]
+            if len(splitIP) == 4:
+                ipAddress = self.IPtextbox.text()
 
         if self.TimeComboBox.currentText() != refreshTime:
             refreshTime = self.TimeComboBox.currentText()
-            print(refreshTime)
+
+        self.CurrentIP.setText(ipAddress)
+        self.CurrentRefTime.setText(str(refreshTime)+" sec")
+        
 
 class MainWindow(QWidget):
     def __init__(self):

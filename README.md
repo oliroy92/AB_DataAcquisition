@@ -1,4 +1,9 @@
+
+<div id="badges" align="center">
+  
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+</div>
 
 # AB_DataAcquisition
 Graphical interface used to acquire data from a Allen Bradley controller and display it onto a live graph.

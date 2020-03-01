@@ -5,8 +5,9 @@ from pylogix import PLC
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.qt_compat import QtCore, QtWidgets, is_pyqt5
+from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
+from matplotlib.figure import Figure
 
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QGridLayout
 from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QSizePolicy, QInputDialog, QLineEdit, QLabel, QComboBox
@@ -15,6 +16,8 @@ from PyQt5.QtGui import QPixmap
 
 global ipAddress 
 global refreshTime
+global simulation
+simulation = True
 ipAddress = "0.0.0.0"
 refreshTime = "1"
 
@@ -94,12 +97,11 @@ class Popup(QWidget):
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.displayedPlot = 1
+        self.displayedPlot = 0
         self.initUI()
 
     def initUI(self):
         self.setWindowTitle('PyLogix Data Acquisition')   
-
         # Create Buttons
         PauseButton = createIconButton('images/pause-icon.png','Press to pause',35)
         PlayButton = createIconButton('images/play-icon.png','Press to play',35)
@@ -111,7 +113,7 @@ class MainWindow(QWidget):
         # What to do if buttons are clicked
         PauseButton.clicked.connect(self._pause_Clicked)
         PlayButton.clicked.connect(self._play_Clicked)
-        SettingsButton.clicked.connect(self.buildPopup)
+        SettingsButton.clicked.connect(self._buildPopup)
         BackwardButton.clicked.connect(self._backward_Clicked)
         ForwardButton.clicked.connect(self._forward_Clicked)
         NextPlotButton.clicked.connect(self._nextPlot)
@@ -131,6 +133,7 @@ class MainWindow(QWidget):
         ButtonLayout.addWidget(PauseButton)
         ButtonLayout.addWidget(ForwardButton)   
         ButtonLayout.addWidget(SettingsButton)
+        ButtonLayout.addWidget(NextPlotButton)  
 
         # Header layout
         HeaderLogo = QLabel()
@@ -147,16 +150,10 @@ class MainWindow(QWidget):
         header_widget.setLayout(HeaderLayout)
         header_widget.setFixedHeight(75)
 
-        # Create figure for plotting
-        self.fig = plt.figure(figsize=(5, 3))
-        self.canvas = FigureCanvas(self.fig)
-        ax = self.fig.add_subplot(1,1,1)
-        xs = []
-        ys = []
-
-        # Graph layout
+        # Create figure for plotting and layout
+        self.dynamic_canvas = FigureCanvas(Figure(figsize=(5, 3)))
         GraphLayout = QVBoxLayout()
-        GraphLayout.addWidget(self.canvas)
+        GraphLayout.addWidget(self.dynamic_canvas)
         graph_widget = QWidget()
         graph_widget.setLayout(GraphLayout)
 
@@ -168,51 +165,42 @@ class MainWindow(QWidget):
         # Set layout to main window
         self.setLayout(grid)
 
-        
+        # Plot
+        self.plot_data = []
+        self.max_length = 50
+        self.time = []
+        self.starttime = time.time()
+        self._dynamic_ax = self.dynamic_canvas.figure.subplots()
+        self._timer = self.dynamic_canvas.new_timer(int(round(float(refreshTime)*1000)), [(self._update_canvas, (), {})])
+        self._timer.start()
 
-        # Establish communication with PLC
-        if ipAddress == "0.0.0.0":
-            DiscoverPLC()
-        else:
-            _update_graph(self)
+    def _update_canvas(self):
+        self._dynamic_ax.clear()                            # clear graph
+        self.time.append(time.time()-self.starttime)        # Get actual time
+        data, dataName, dataUnit = getLogixData()           # Get new data from PLC
+        saveData(data, dataName, dataUnit)                  # Export new data
+
+        self.plot_data.append(data[self.displayedPlot])     # Add new data to plotted data
+        if len(self.plot_data) > self.max_length:           
+            self.plot_data.pop(0)
+            self.time.pop(0)
+
+        self._dynamic_ax.plot(self.time, self.plot_data)    # Set the data to draw
+        self._dynamic_ax.figure.canvas.draw()               # Plot graph
+
+        # Update refresh time
+        self._timer.stop()
+        self._timer = self.dynamic_canvas.new_timer(int(round(float(refreshTime)))*1000, [(self._update_canvas, (), {})])
+        self._timer.start()
 
     def _nextPlot(self):
-        self.displayedPlot = displayedPlot + 1
-        if displayedPlot > 5:
-            displayedPlot = 1
+        self.displayedPlot = self.displayedPlot + 1
+        if self.displayedPlot > 4:
+            self.displayedPlot = 0
 
-    def buildPopup(self):
+    def _buildPopup(self):
         self.popup_window = Popup()
         self.popup_window.show()
-
-    def _update_graph(self):
-        ani = animation.FuncAnimation(fig, animate, fargs=(xs, ys), interval=1000)
-        plt.show()
-    
-    def animate(i, xs, ys):
-
-        dataToRead = displayedPlot - 1
-        # Read temperature (Celsius) from TMP102
-        newdata, dataNames, dataUnits = getLogixData()
-        newtime = getPLCtime()
-
-        # Add x and y to lists
-        xs.append(newtime)
-        ys.append(newdata[dataToRead])
-
-        # Limit x and y lists to 20 items
-        xs = xs[-30:]
-        ys = ys[-30:]
-
-        # Draw x and y lists
-        ax.clear()
-        ax.plot(xs, ys)
-
-        # Format plot
-        plt.xticks(rotation=45, ha='right')
-        plt.subplots_adjust(bottom=0.30)
-        plt.title('Graph of ' + dataNames[dataToRead] + " from " + xs[0] + " to " + xs[29])
-        plt.ylabel(dataNames[dataToRead])    
 
     def _play_Clicked(self):
         print(_getLogixData(self))
@@ -226,6 +214,16 @@ class MainWindow(QWidget):
     def _forward_Clicked(self):
         print("Forward")
 
+def saveData(data, dataName, dataUnit):
+    print("")
+
+def simulate(initvalue):
+    if initvalue %2 == 0:
+        data = initvalue + 1
+    else:
+        data = initvalue + 3
+    return data
+
 def getPLCtime():
     with PLC() as comm:
         ret = comm.GetPLCTime()
@@ -236,24 +234,41 @@ def DiscoverPLC():
         devices = comm.Discover()
         for device in devices.value:
             if device.DeviceType == 'Programmable Logic Controller':
-                if ipAddress != device.IPAddress:
-                    ipAddress = device.IPAddress
-                    with PLC() as comm:
-                        comm.IPAddress = ipAddress
-                    print("PLC found! IP address configured")
-                    return
+                PLClist.append(device)
+                return PLClist
 
 def getLogixData():
     # gets data from the PLC at the entered ipAdress.
     tag_list = [ 'LogixData1',  'LogixData2','LogixData3','LogixData4','LogixData5','LogixDataName1','LogixDataName2','LogixDataName3','LogixDataName4','LogixDataName5'
                     ,'LogixDataUnit1','LogixDataUnit2', 'LogixDataUnit3','LogixDataUnit4','LogixDataUnit5']
-    with PLC() as comm:
-        comm.IPAddress = ipAddress
-        ret = comm.Read(tag_list)
-        data = ret[0:4]
-        dataName = ret[5:9] 
-        dataUnit = ret[10:14]
+    data = [0,0,0,0,0]
+    dataName = ["","","","",""]
+    dataUnit = ["","","","",""]
+    if not simulation:
+        with PLC() as comm:
+            comm.IPAddress = ipAddress
+            ret = comm.Read(tag_list)
+            data = ret[0:4]
+            dataName = ret[5:9] 
+            dataUnit = ret[10:14]
+    else:
+        data[0] = simulate(1)
+        data[1] = simulate(2)
+        data[2] = simulate(6)
+        data[3] = simulate(-4)
+        data[4] = simulate(3)
 
+        dataName[0] = "dataName1"
+        dataName[1] = "dataName2"
+        dataName[2] = "dataName3"
+        dataName[3] = "dataName4"
+        dataName[4] = "dataName5"
+
+        dataUnit[0] = "N"
+        dataUnit[1] = "N"
+        dataUnit[2] = "N"
+        dataUnit[3] = "N"
+        dataUnit[4] = "N"
     return data, dataName, dataUnit 
 
 def createIconButton(iconStr, toolTipStr, iconSize):

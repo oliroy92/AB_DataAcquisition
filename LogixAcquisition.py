@@ -1,22 +1,29 @@
 import sys
 import time
+import datetime
 
 from pylogix import PLC
+import random
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.qt_compat import QtCore, QtWidgets, is_pyqt5
 from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
 from matplotlib.figure import Figure
+import matplotlib.ticker
 
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QGridLayout
 from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QSizePolicy, QInputDialog, QLineEdit, QLabel, QComboBox
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtGui import QPixmap
 
+plt.style.use('dark_background')
+
 global ipAddress 
 global refreshTime
 global simulation
+global dataLog
+dataLog = [ [],[],[],[],[] ]
 simulation = True
 ipAddress = "0.0.0.0"
 refreshTime = "1"
@@ -108,7 +115,7 @@ class MainWindow(QWidget):
         SettingsButton = createIconButton('images/settings-icon.png','Press to go into settings',35)
         BackwardButton = createIconButton('images/backward-icon.png','Press to go backward in time',35)
         ForwardButton = createIconButton('images/forward-icon.png','Press to go forward in time',35)
-        NextPlotButton = createButton("Next Plot", "Press to display next plot", 16)
+        NextPlotButton = createButton("Next Plot", "Press to display next plot", 10)
 
         # What to do if buttons are clicked
         PauseButton.clicked.connect(self._pause_Clicked)
@@ -151,7 +158,8 @@ class MainWindow(QWidget):
         header_widget.setFixedHeight(75)
 
         # Create figure for plotting and layout
-        self.dynamic_canvas = FigureCanvas(Figure(figsize=(5, 3)))
+        self.fig = Figure(figsize=(5, 3))
+        self.dynamic_canvas = FigureCanvas(self.fig)
         GraphLayout = QVBoxLayout()
         GraphLayout.addWidget(self.dynamic_canvas)
         graph_widget = QWidget()
@@ -167,30 +175,36 @@ class MainWindow(QWidget):
 
         # Plot
         self.plot_data = []
-        self.max_length = 50
+        self.max_length = 10
         self.time = []
-        self.starttime = time.time()
         self._dynamic_ax = self.dynamic_canvas.figure.subplots()
-        self._timer = self.dynamic_canvas.new_timer(int(round(float(refreshTime)*1000)), [(self._update_canvas, (), {})])
+        self._timer = self.dynamic_canvas.new_timer(int(float(refreshTime)*1000), [(self._update_canvas, (), {})])
         self._timer.start()
 
     def _update_canvas(self):
-        self._dynamic_ax.clear()                            # clear graph
-        self.time.append(time.time()-self.starttime)        # Get actual time
-        data, dataName, dataUnit = getLogixData()           # Get new data from PLC
-        saveData(data, dataName, dataUnit)                  # Export new data
+        self._dynamic_ax.clear()                                                    # clear graph
+        now = datetime.datetime.now()
+        currentTime = str(now.month) + "/" + str(now.day) + " " + str(now.hour) + ":" + str(now.minute) + ":" + str(now.second) + "." +  str(round(now.microsecond/10000)) # Get actual time
+        self.time.append(currentTime)                                               # append actual time
+        data, dataName, dataUnit = getLogixData()                                   # Get new data from PLC
+        exportData(data, dataName, dataUnit)                                        # Export new data
 
-        self.plot_data.append(data[self.displayedPlot])     # Add new data to plotted data
+        newdata = data[self.displayedPlot]
+        newdataName = dataName[self.displayedPlot]
+
+        self._dynamic_ax.set_title("Graph of " + newdataName + " from " + str(self.time[0]) + " to " + str(self.time[-1]))
+
+        self.plot_data.append(newdata)     # Add new data to plotted data
         if len(self.plot_data) > self.max_length:           
             self.plot_data.pop(0)
             self.time.pop(0)
 
         self._dynamic_ax.plot(self.time, self.plot_data)    # Set the data to draw
-        self._dynamic_ax.figure.canvas.draw()               # Plot graph
+        self._dynamic_ax.figure.canvas.draw()              # Plot graph
 
         # Update refresh time
         self._timer.stop()
-        self._timer = self.dynamic_canvas.new_timer(int(round(float(refreshTime)))*1000, [(self._update_canvas, (), {})])
+        self._timer = self.dynamic_canvas.new_timer(int(float(refreshTime)*1000), [(self._update_canvas, (), {})])
         self._timer.start()
 
     def _nextPlot(self):
@@ -214,15 +228,17 @@ class MainWindow(QWidget):
     def _forward_Clicked(self):
         print("Forward")
 
-def saveData(data, dataName, dataUnit):
-    print("")
+def exportData(datalist, dataNamelist, dataUnitlist):
+    global dataLog
+    for idx, data in enumerate(datalist):
+        dataLog[idx].append(data)
 
-def simulate(initvalue):
-    if initvalue %2 == 0:
-        data = initvalue + 1
-    else:
-        data = initvalue + 3
-    return data
+    
+    #with open('datalog.csv','a') as fd:
+     ##   fd.write(myCsvRow)
+
+def simulate():
+    return random.random()
 
 def getPLCtime():
     with PLC() as comm:
@@ -241,7 +257,7 @@ def getLogixData():
     # gets data from the PLC at the entered ipAdress.
     tag_list = [ 'LogixData1',  'LogixData2','LogixData3','LogixData4','LogixData5','LogixDataName1','LogixDataName2','LogixDataName3','LogixDataName4','LogixDataName5'
                     ,'LogixDataUnit1','LogixDataUnit2', 'LogixDataUnit3','LogixDataUnit4','LogixDataUnit5']
-    data = [0,0,0,0,0]
+    #data = [0,0,0,0,0]
     dataName = ["","","","",""]
     dataUnit = ["","","","",""]
     if not simulation:
@@ -252,11 +268,13 @@ def getLogixData():
             dataName = ret[5:9] 
             dataUnit = ret[10:14]
     else:
-        data[0] = simulate(1)
-        data[1] = simulate(2)
-        data[2] = simulate(6)
-        data[3] = simulate(-4)
-        data[4] = simulate(3)
+        data0 = simulate()
+        data1 = simulate()
+        data2 = simulate()
+        data3 = simulate()
+        data4 = simulate()
+
+        data = [data0, data1, data2, data3, data4]
 
         dataName[0] = "dataName1"
         dataName[1] = "dataName2"

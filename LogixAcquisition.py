@@ -24,7 +24,7 @@ global refreshTime
 global simulation
 global dataLog
 dataLog = [ [],[],[],[],[] ]
-simulation = True
+simulation = False
 ipAddress = "0.0.0.0"
 refreshTime = "1"
 
@@ -182,25 +182,28 @@ class MainWindow(QWidget):
         self._timer.start()
 
     def _update_canvas(self):
+        if ipAddress == "0.0.0.0":
+            return
         self._dynamic_ax.clear()                                                    # clear graph
         now = datetime.datetime.now()
         currentTime = str(now.month) + "/" + str(now.day) + " " + str(now.hour) + ":" + str(now.minute) + ":" + str(now.second) + "." +  str(round(now.microsecond/10000)) # Get actual time
         self.time.append(currentTime)                                               # append actual time
         data, dataName, dataUnit = getLogixData()                                   # Get new data from PLC
         exportData(data, dataName, dataUnit)                                        # Export new data
-
+        
         newdata = data[self.displayedPlot]
         newdataName = dataName[self.displayedPlot]
+        self._dynamic_ax.set_title("Graph of " + str(newdataName) + " from " + str(self.time[0]) + " to " + str(self.time[-1]))
 
-        self._dynamic_ax.set_title("Graph of " + newdataName + " from " + str(self.time[0]) + " to " + str(self.time[-1]))
+        self.plot_data.append(newdata)                      # Add new data to plotted data
 
-        self.plot_data.append(newdata)     # Add new data to plotted data
         if len(self.plot_data) > self.max_length:           
             self.plot_data.pop(0)
             self.time.pop(0)
-
+        print(self.time)
+        print(self.plot_data)
         self._dynamic_ax.plot(self.time, self.plot_data)    # Set the data to draw
-        self._dynamic_ax.figure.canvas.draw()              # Plot graph
+        self._dynamic_ax.figure.canvas.draw()               # Plot graph
 
         # Update refresh time
         self._timer.stop()
@@ -238,35 +241,46 @@ def exportData(datalist, dataNamelist, dataUnitlist):
      ##   fd.write(myCsvRow)
 
 def simulate():
-    return random.random()
+    return random.random()              # Simulate random data
 
 def getPLCtime():
     with PLC() as comm:
-        ret = comm.GetPLCTime()
+        ret = comm.GetPLCTime()         # Get PLC date and time.
     return ret
 
 def DiscoverPLC():
+    PLClist = []
     with PLC() as comm:
-        devices = comm.Discover()
-        for device in devices.value:
+        devices = comm.Discover()       # Discover PLC on Ethernet/IP network.
+        for device in devices.value:    
             if device.DeviceType == 'Programmable Logic Controller':
-                PLClist.append(device)
+                PLClist.append(device)  # Add each PLC to the PLC list
                 return PLClist
 
 def getLogixData():
     # gets data from the PLC at the entered ipAdress.
-    tag_list = [ 'LogixData1',  'LogixData2','LogixData3','LogixData4','LogixData5','LogixDataName1','LogixDataName2','LogixDataName3','LogixDataName4','LogixDataName5'
-                    ,'LogixDataUnit1','LogixDataUnit2', 'LogixDataUnit3','LogixDataUnit4','LogixDataUnit5']
-    #data = [0,0,0,0,0]
+    data_taglist = [ 'LogixData1',  'LogixData2','LogixData3','LogixData4','LogixData5'                   ]
+    name_taglist = [ 'LogixDataName1','LogixDataName2','LogixDataName3','LogixDataName4','LogixDataName5' ]
+    unit_taglist = [ 'LogixDataUnit1','LogixDataUnit2', 'LogixDataUnit3','LogixDataUnit4','LogixDataUnit5']
+
     dataName = ["","","","",""]
     dataUnit = ["","","","",""]
     if not simulation:
         with PLC() as comm:
+            data = []
+            dataName = []
+            dataUnit = []
             comm.IPAddress = ipAddress
-            ret = comm.Read(tag_list)
-            data = ret[0:4]
-            dataName = ret[5:9] 
-            dataUnit = ret[10:14]
+            ret = comm.Read(data_taglist)
+            for response in ret:
+                data.append(response.Value)
+            ret = comm.Read(name_taglist)
+            for response in ret:
+                dataName.append(response.Value)
+            ret = comm.Read(unit_taglist)
+            for response in ret:
+                dataUnit.append(response.Value)
+
     else:
         data0 = simulate()
         data1 = simulate()

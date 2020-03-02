@@ -45,9 +45,11 @@ class Popup(QWidget):
         EnterIPlabel = QLabel("Enter PLC IP Address:")
         EnterIPlabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
 
-        self.IPtextbox = QLineEdit()
-        self.IPtextbox.setGeometry(10,35,150,20)
-        self.IPtextbox.setFont(QtGui.QFont("Arial",12))
+        self.IPComboBox = QComboBox()
+        IPlist = DiscoverDevicesIP()
+        self.IPComboBox.addItems(IPlist)
+        self.IPComboBox.setFixedHeight(35)
+        self.IPComboBox.setFont(QtGui.QFont("Arial", 10))
 
         CurrentRefTimeLabel = QLabel("Current refresh time:")
         CurrentRefTimeLabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
@@ -62,6 +64,7 @@ class Popup(QWidget):
         self.TimeComboBox.addItems(Items)
         self.TimeComboBox.setFixedHeight(35)
         self.TimeComboBox.setFont(QtGui.QFont("Arial", 10))
+        self.TimeComboBox.setCurrentIndex(Items.index(refreshTime))
 
         applyButton = createButton("Apply", "Press to apply changes", 12)
         applyButton.clicked.connect(self.ApplyChanges)
@@ -74,7 +77,7 @@ class Popup(QWidget):
         grid.addWidget(CurrentIPlabel,0,0)
         grid.addWidget(self.CurrentIP,0,1)
         grid.addWidget(EnterIPlabel,1,0)
-        grid.addWidget(self.IPtextbox,1,1)
+        grid.addWidget(self.IPComboBox,1,1)
         grid.addWidget(CurrentRefTimeLabel,2,0)
         grid.addWidget(self.CurrentRefTime,2,1)
         grid.addWidget(RefreshTimeLabel,3,0)
@@ -88,11 +91,8 @@ class Popup(QWidget):
         global ipAddress
         global refreshTime
 
-        if self.IPtextbox.text() != ipAddress:
-            splitIP = self.IPtextbox.text().split(".")
-            splitIP = [i for i in splitIP if i]
-            if len(splitIP) == 4:
-                ipAddress = self.IPtextbox.text()
+        if self.IPComboBox.currentText() != ipAddress:
+            ipAddress = self.IPComboBox.currentText()
 
         if self.TimeComboBox.currentText() != refreshTime:
             refreshTime = self.TimeComboBox.currentText()
@@ -186,7 +186,7 @@ class MainWindow(QWidget):
             return
         self._dynamic_ax.clear()                                                    # clear graph
         now = datetime.datetime.now()
-        currentTime = str(now.month) + "/" + str(now.day) + " " + str(now.hour) + ":" + str(now.minute) + ":" + str(now.second) + "." +  str(round(now.microsecond/10000)) # Get actual time
+        currentTime = str(now.hour) + ":" + str(now.minute) + ":" + str(now.second) + "." +  str(round(now.microsecond/10000)) # Get actual time
         self.time.append(currentTime)                                               # append actual time
         data, dataName, dataUnit = getLogixData()                                   # Get new data from PLC
         exportData(data, dataName, dataUnit)                                        # Export new data
@@ -200,8 +200,6 @@ class MainWindow(QWidget):
         if len(self.plot_data) > self.max_length:           
             self.plot_data.pop(0)
             self.time.pop(0)
-        print(self.time)
-        print(self.plot_data)
         self._dynamic_ax.plot(self.time, self.plot_data)    # Set the data to draw
         self._dynamic_ax.figure.canvas.draw()               # Plot graph
 
@@ -235,10 +233,8 @@ def exportData(datalist, dataNamelist, dataUnitlist):
     global dataLog
     for idx, data in enumerate(datalist):
         dataLog[idx].append(data)
-
-    
     #with open('datalog.csv','a') as fd:
-     ##   fd.write(myCsvRow)
+        #fd.write(myCsvRow)
 
 def simulate():
     return random.random()              # Simulate random data
@@ -248,14 +244,13 @@ def getPLCtime():
         ret = comm.GetPLCTime()         # Get PLC date and time.
     return ret
 
-def DiscoverPLC():
-    PLClist = []
+def DiscoverDevicesIP():
+    IPList = []
     with PLC() as comm:
-        devices = comm.Discover()       # Discover PLC on Ethernet/IP network.
-        for device in devices.value:    
-            if device.DeviceType == 'Programmable Logic Controller':
-                PLClist.append(device)  # Add each PLC to the PLC list
-                return PLClist
+        devices = comm.Discover()       # Discover devices on Ethernet/IP network.
+        for device in devices.Value:    
+            IPList.append(device.IPAddress)
+    return IPList
 
 def getLogixData():
     # gets data from the PLC at the entered ipAdress.

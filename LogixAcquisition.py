@@ -1,11 +1,17 @@
 import sys
+import os
+import re
 import time
 import datetime
 
 from pylogix import PLC
 import random
 
-import numpy as np
+import pandas
+from pandas.io.excel import ExcelWriter
+import csv
+import glob
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.qt_compat import QtCore, QtWidgets, is_pyqt5
 from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
@@ -17,16 +23,20 @@ from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QSizePolicy, QIn
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtGui import QPixmap
 
-plt.style.use('dark_background')
+# Global variables initialisation
 
 global ipAddress 
 global refreshTime
 global simulation
-global dataLog
-dataLog = [ [],[],[],[],[] ]
+global logPeriod
+global currentLogFile
+
+currentLogFile = "log.csv"
 simulation = False
 ipAddress = "0.0.0.0"
 refreshTime = "1"
+logPeriod = "1 Month"
+plt.style.use('dark_background')
 
 class Popup(QWidget):
     def __init__(self):
@@ -35,7 +45,7 @@ class Popup(QWidget):
 
     def initUI(self):
         self.setWindowTitle('Configuration')
-        self.setFixedSize(600,400)
+        self.setFixedSize(800,400)
 
         CurrentIPlabel = QLabel("Current PLC IP Address:")
         CurrentIPlabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
@@ -51,8 +61,10 @@ class Popup(QWidget):
         self.IPComboBox.setFixedHeight(35)
         self.IPComboBox.setFont(QtGui.QFont("Arial", 10))
 
+        # Data refresh time
         CurrentRefTimeLabel = QLabel("Current refresh time:")
         CurrentRefTimeLabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
+
         self.CurrentRefTime = QLabel(str(refreshTime)+" sec")
         self.CurrentRefTime.setFont(QtGui.QFont("Arial", 12))
 
@@ -66,8 +78,21 @@ class Popup(QWidget):
         self.TimeComboBox.setFont(QtGui.QFont("Arial", 10))
         self.TimeComboBox.setCurrentIndex(Items.index(refreshTime))
 
+        # Apply changes button
         applyButton = createButton("Apply", "Press to apply changes", 12)
         applyButton.clicked.connect(self.ApplyChanges)
+
+        # New log period setting
+        NewLogTimeLabel = QLabel("Period to create new log file:")
+        NewLogTimeLabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
+
+        self.LogComboBox = QComboBox()
+        Items = ["1 Day","7 Days","14 Days","1 Month"]
+        self.LogComboBox.addItems(Items)
+        self.LogComboBox.setFixedHeight(35)
+        self.LogComboBox.setFont(QtGui.QFont("Arial", 10))
+        self.LogComboBox.setCurrentIndex(Items.index(logPeriod))
+
 
         # Popup layout
         grid = QGridLayout()
@@ -83,6 +108,8 @@ class Popup(QWidget):
         grid.addWidget(RefreshTimeLabel,3,0)
         grid.addWidget(self.TimeComboBox,3,1)
         grid.addWidget(applyButton,4,1)
+        grid.addWidget(NewLogTimeLabel, 0,2)
+        grid.addWidget(self.LogComboBox, 0,3)
 
         self.setGeometry(600,600,400,100)
         self.setLayout(grid)
@@ -90,6 +117,7 @@ class Popup(QWidget):
     def ApplyChanges(self):
         global ipAddress
         global refreshTime
+        global logPeriod
 
         if self.IPComboBox.currentText() != ipAddress:
             ipAddress = self.IPComboBox.currentText()
@@ -99,7 +127,9 @@ class Popup(QWidget):
 
         self.CurrentIP.setText(ipAddress)
         self.CurrentRefTime.setText(str(refreshTime)+" sec")
-        
+
+        if self.LogComboBox.currentText() != logPeriod:
+            logPeriod = self.LogComboBox.currentText()
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -174,6 +204,8 @@ class MainWindow(QWidget):
         self.setLayout(grid)
 
         # Plot
+        self.maxvalue = 1
+        self.minvalue = 0
         self.plot_data = []
         self.max_length = 10
         self.time = []
@@ -182,28 +214,38 @@ class MainWindow(QWidget):
         self._timer.start()
 
     def _update_canvas(self):
-        if ipAddress == "0.0.0.0":
+        IPlist = DiscoverDevicesIP()
+        if ipAddress not in IPlist:
             return
-        self._dynamic_ax.clear()                                                    # clear graph
-        now = datetime.datetime.now()
-        currentTime = str(now.hour) + ":" + str(now.minute) + ":" + str(now.second) + "." +  str(round(now.microsecond/10000)) # Get actual time
-        self.time.append(currentTime)                                               # append actual time
-        data, dataName, dataUnit = getLogixData()                                   # Get new data from PLC
-        exportData(data, dataName, dataUnit)                                        # Export new data
+    
+        self._dynamic_ax.clear()                                                  # clear graph
+
+        exportData()                                                             # Export new data
+        data, name, self.time = readData(self.max_length)
         
-        newdata = data[self.displayedPlot]
-        newdataName = dataName[self.displayedPlot]
-        self._dynamic_ax.set_title("Graph of " + str(newdataName) + " from " + str(self.time[0]) + " to " + str(self.time[-1]))
+        self.plot_data = [float(item[self.displayedPlot]) for item in data] 
+        
+        if max(self.plot_data) > self.maxvalue:
+            self.maxvalue = max(self.plot_data)
+        if min(self.plot_data) < self.minvalue:
+            self.minvalue = min(self.plot_data)
 
-        self.plot_data.append(newdata)                      # Add new data to plotted data
+        rangedifferential = self.maxvalue - self.minvalue
+        minrange = self.minvalue - (0.1*rangedifferential)
+        maxrange = self.maxvalue + (0.1*rangedifferential)
 
-        if len(self.plot_data) > self.max_length:           
-            self.plot_data.pop(0)
-            self.time.pop(0)
+        dataName = name[self.displayedPlot]
+        
+        self._dynamic_ax.set_ylim(minrange, maxrange)
+        self._dynamic_ax.set_title("Graph of " + str(dataName) )#+ " from " + str(self.time[0]) + " to " + str(self.time[-1]))
         self._dynamic_ax.plot(self.time, self.plot_data)    # Set the data to draw
         self._dynamic_ax.figure.canvas.draw()               # Plot graph
+        
+        #plt.ylim(self.minvalue, self.maxvalue)
+        #_updateRefreshTime(self)
 
-        # Update refresh time
+
+    def _updateRefreshTime(self):
         self._timer.stop()
         self._timer = self.dynamic_canvas.new_timer(int(float(refreshTime)*1000), [(self._update_canvas, (), {})])
         self._timer.start()
@@ -229,12 +271,82 @@ class MainWindow(QWidget):
     def _forward_Clicked(self):
         print("Forward")
 
-def exportData(datalist, dataNamelist, dataUnitlist):
-    global dataLog
-    for idx, data in enumerate(datalist):
-        dataLog[idx].append(data)
-    #with open('datalog.csv','a') as fd:
-        #fd.write(myCsvRow)
+def readData(length):
+    WorkingDirectory = os.path.dirname(os.path.abspath(__file__))           # Get the current working directory of the executable.
+    os.chdir(WorkingDirectory + "/Log")                                     # Navigate to Log directory
+
+    data = []
+    time = []
+
+    with open(currentLogFile, "r") as f:                # Open file for reading
+        csvData = f.readlines()
+    csvName = csvData[0]                                # Save the first line as the header
+    csvData.pop(0)                                      # Remove the first line (header)
+    csvData = csvData[-length:]                         # Keep only last "length" elements of the list (number of lines)
+    csvData = [ item.strip() for item in csvData ]      # Remove end of line (\n) characters
+    
+    lines = [ item.split(";") for item in csvData ]    
+    time = [item[0] for item in lines]                  # Get all first elements of each sublists as time values
+    
+    for line in lines:
+        del line[0]                                     # Delete all first elements of each sublists to save only data
+    data = lines
+    
+    csvName = csvName.strip()                           
+    name = csvName.split(';')
+    name.pop(0)                                         # Remove the first header (time)
+    return data, name, time
+    
+
+def exportData():
+    global currentLogFile
+    
+    datalist, dataNamelist = getLogixData()
+    time = str(datetime.datetime.now().strftime("%H:%M:%S"))                # Get actual time
+
+    WorkingDirectory = os.path.dirname(os.path.abspath(__file__))           # Get the current working directory of the executable.
+    os.chdir(WorkingDirectory)
+    CurrentDirectoryList = os.listdir()
+
+    if "Log" not in CurrentDirectoryList:
+        os.mkdir(WorkingDirectory + "/Log")
+    os.chdir(WorkingDirectory + "/Log")
+
+    csvFilesList = glob.glob("*.csv")
+    csvFilesList.sort()
+
+    filetime = datetime.datetime.now().strftime("%Y-%m-%d")
+    CSVFileName = filetime + "_DataLog.csv"
+
+    if CSVFileName not in csvFilesList:
+        writeCSVheader(dataNamelist, CSVFileName)
+        appendCSVrow(time, datalist, CSVFileName)
+        
+    else:
+        appendCSVrow(time, datalist, CSVFileName)
+
+    currentLogFile = CSVFileName
+    os.chdir(WorkingDirectory)
+
+
+def writeCSVheader(NameList, FileName):
+    HeaderRow = "Time"
+    for name in NameList:
+        HeaderRow = HeaderRow + ";" + name
+    HeaderRow = HeaderRow + "\n"
+
+    f = open(FileName, "w+")
+    f.write(HeaderRow)
+
+def appendCSVrow(Time, DataList, FileName):
+    DataRow = Time 
+    for Data in DataList:
+        DataRow = DataRow + ";" + str(Data)
+    DataRow = DataRow + "\n"
+    
+    with open(FileName, "a") as f:
+        f.write(DataRow)
+
 
 def simulate():
     return random.random()              # Simulate random data
@@ -252,51 +364,45 @@ def DiscoverDevicesIP():
             IPList.append(device.IPAddress)
     return IPList
 
+def getCurrentTime():
+    now = datetime.datetime.now()
+    year = now.year
+    month = now.month
+    day = now.day
+    hour = now.hour
+    minute = now.minute
+    second = now.second
+    millisec = now.microsecond/1000
+    return year, month, day, hour, minute, second, millisec
+
 def getLogixData():
     # gets data from the PLC at the entered ipAdress.
     data_taglist = [ 'LogixData1',  'LogixData2','LogixData3','LogixData4','LogixData5'                   ]
     name_taglist = [ 'LogixDataName1','LogixDataName2','LogixDataName3','LogixDataName4','LogixDataName5' ]
-    unit_taglist = [ 'LogixDataUnit1','LogixDataUnit2', 'LogixDataUnit3','LogixDataUnit4','LogixDataUnit5']
 
-    dataName = ["","","","",""]
-    dataUnit = ["","","","",""]
-    if not simulation:
+    data = []
+    dataName = []
+
+    if simulation:
+        dataName = ["","","","",""]
+        while True:
+            data.append(simulate())
+            if len(data) == 5:
+                break
+    
+    else:
         with PLC() as comm:
-            data = []
-            dataName = []
-            dataUnit = []
-            comm.IPAddress = ipAddress
-            ret = comm.Read(data_taglist)
+            comm.IPAddress = ipAddress      # Search for tags in the PLC at the current IP Address 
+            ret = comm.Read(data_taglist)   # Read data tags
+            print(ret)
             for response in ret:
-                data.append(response.Value)
-            ret = comm.Read(name_taglist)
+                data.append(response.Value) 
+            ret = comm.Read(name_taglist)   # Read name tags
             for response in ret:
                 dataName.append(response.Value)
-            ret = comm.Read(unit_taglist)
-            for response in ret:
-                dataUnit.append(response.Value)
 
-    else:
-        data0 = simulate()
-        data1 = simulate()
-        data2 = simulate()
-        data3 = simulate()
-        data4 = simulate()
-
-        data = [data0, data1, data2, data3, data4]
-
-        dataName[0] = "dataName1"
-        dataName[1] = "dataName2"
-        dataName[2] = "dataName3"
-        dataName[3] = "dataName4"
-        dataName[4] = "dataName5"
-
-        dataUnit[0] = "N"
-        dataUnit[1] = "N"
-        dataUnit[2] = "N"
-        dataUnit[3] = "N"
-        dataUnit[4] = "N"
-    return data, dataName, dataUnit 
+    return data, dataName
+   
 
 def createIconButton(iconStr, toolTipStr, iconSize):
     button = QPushButton("")
@@ -305,6 +411,7 @@ def createIconButton(iconStr, toolTipStr, iconSize):
     button.setIconSize(QtCore.QSize(iconSize,iconSize))
     button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     return button
+
 
 def createButton(text, toolTipStr, textsize):
     button = QPushButton(text)

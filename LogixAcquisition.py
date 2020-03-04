@@ -18,6 +18,7 @@ from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2
 from matplotlib.figure import Figure
 import matplotlib.ticker
 
+from PyQt5 import QtWidgets, uic
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QGridLayout
 from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QSizePolicy, QInputDialog, QLineEdit, QLabel, QComboBox
 from PyQt5 import QtGui, QtCore
@@ -30,7 +31,9 @@ global refreshTime
 global simulation
 global logPeriod
 global currentLogFile
+global numberOfTags
 
+numberOfTags = 1
 currentLogFile = "log.csv"
 simulation = False
 ipAddress = "0.0.0.0"
@@ -38,81 +41,40 @@ refreshTime = "1"
 logPeriod = "1 Month"
 plt.style.use('dark_background')
 
-class Popup(QWidget):
+class SettingsPopup(QtWidgets.QDialog):
     def __init__(self):
-        super().__init__()
+        super(SettingsPopup, self).__init__()
+        uic.loadUi(os.path.dirname(os.path.abspath(__file__)) +  "\\SettingsPopup.ui",self)
+        self.show()
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle('Configuration')
-        self.setFixedSize(800,400)
-
-        CurrentIPlabel = QLabel("Current PLC IP Address:")
-        CurrentIPlabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
-        self.CurrentIP = QLabel(ipAddress)
-        self.CurrentIP.setFont(QtGui.QFont("Arial", 12))
-
-        EnterIPlabel = QLabel("Enter PLC IP Address:")
-        EnterIPlabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
-
-        self.IPComboBox = QComboBox()
+        self.IPComboBox = self.findChild(QtWidgets.QComboBox, 'CB_ipAddress')
         IPlist = DiscoverDevicesIP()
         self.IPComboBox.addItems(IPlist)
-        self.IPComboBox.setFixedHeight(35)
-        self.IPComboBox.setFont(QtGui.QFont("Arial", 10))
+        self.IPComboBox.setCurrentIndex(IPlist.index(ipAddress))
 
-        # Data refresh time
-        CurrentRefTimeLabel = QLabel("Current refresh time:")
-        CurrentRefTimeLabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
-
-        self.CurrentRefTime = QLabel(str(refreshTime)+" sec")
-        self.CurrentRefTime.setFont(QtGui.QFont("Arial", 12))
-
-        RefreshTimeLabel = QLabel("New refresh time (sec):")
-        RefreshTimeLabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
-
-        self.TimeComboBox = QComboBox()
+        self.refreshTimeCB = self.findChild(QtWidgets.QComboBox, 'CB_refreshTime')
         Items = ["0.5","1","2","5","10","30","60","120","300","600"]
-        self.TimeComboBox.addItems(Items)
-        self.TimeComboBox.setFixedHeight(35)
-        self.TimeComboBox.setFont(QtGui.QFont("Arial", 10))
-        self.TimeComboBox.setCurrentIndex(Items.index(refreshTime))
+        self.refreshTimeCB.addItems(Items)
+        self.refreshTimeCB.setCurrentIndex(Items.index(refreshTime))
 
-        # Apply changes button
-        applyButton = createButton("Apply", "Press to apply changes", 12)
+        applyButton = self.findChild(QtWidgets.QPushButton, 'PB_Apply')
         applyButton.clicked.connect(self.ApplyChanges)
 
-        # New log period setting
-        NewLogTimeLabel = QLabel("Period to create new log file:")
-        NewLogTimeLabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Bold))
+        cancelButton = self.findChild(QtWidgets.QPushButton, 'PB_Cancel')
+        cancelButton.clicked.connect(self.close)
 
-        self.LogComboBox = QComboBox()
+        self.tagNumberCB = self.findChild(QtWidgets.QComboBox, 'CB_tagNumber')
+        Items = [ "1","2","3","4","5","6","7","8","9","10",
+                  "11","12","13","14","15","16","17","18","19","20" ]
+        self.tagNumberCB.addItems(Items)
+        self.tagNumberCB.setCurrentIndex(Items.index(str(numberOfTags)))
+
+        self.LogComboBox = self.findChild(QtWidgets.QComboBox, 'CB_logPeriod')
         Items = ["1 Day","7 Days","14 Days","1 Month"]
         self.LogComboBox.addItems(Items)
-        self.LogComboBox.setFixedHeight(35)
-        self.LogComboBox.setFont(QtGui.QFont("Arial", 10))
         self.LogComboBox.setCurrentIndex(Items.index(logPeriod))
-
-
-        # Popup layout
-        grid = QGridLayout()
-        grid.setVerticalSpacing(50)
-        grid.setHorizontalSpacing(20)
-
-        grid.addWidget(CurrentIPlabel,0,0)
-        grid.addWidget(self.CurrentIP,0,1)
-        grid.addWidget(EnterIPlabel,1,0)
-        grid.addWidget(self.IPComboBox,1,1)
-        grid.addWidget(CurrentRefTimeLabel,2,0)
-        grid.addWidget(self.CurrentRefTime,2,1)
-        grid.addWidget(RefreshTimeLabel,3,0)
-        grid.addWidget(self.TimeComboBox,3,1)
-        grid.addWidget(applyButton,4,1)
-        grid.addWidget(NewLogTimeLabel, 0,2)
-        grid.addWidget(self.LogComboBox, 0,3)
-
-        self.setGeometry(600,600,400,100)
-        self.setLayout(grid)
 
     def ApplyChanges(self):
         global ipAddress
@@ -131,96 +93,63 @@ class Popup(QWidget):
         if self.LogComboBox.currentText() != logPeriod:
             logPeriod = self.LogComboBox.currentText()
 
-class MainWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.displayedPlot = 0
-        self.initUI()
+        self.close()
 
+class MainWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super(MainWindow,self).__init__()
+        uic.loadUi('MainWindow.ui',self)
+        self.initUI()
+    
     def initUI(self):
-        self.setWindowTitle('PyLogix Data Acquisition')   
-        # Create Buttons
-        PauseButton = createIconButton('images/pause-icon.png','Press to pause',35)
-        PlayButton = createIconButton('images/play-icon.png','Press to play',35)
-        SettingsButton = createIconButton('images/settings-icon.png','Press to go into settings',35)
-        BackwardButton = createIconButton('images/backward-icon.png','Press to go backward in time',35)
-        ForwardButton = createIconButton('images/forward-icon.png','Press to go forward in time',35)
-        NextPlotButton = createButton("Next Plot", "Press to display next plot", 10)
+        global ipAddress
+
+        # Find buttons in the UI
+        self.PauseButton = self.findChild(QtWidgets.QPushButton, 'PauseButton')
+        self.PlayButton = self.findChild(QtWidgets.QPushButton, 'PlayButton')
+        self.SettingsButton = self.findChild(QtWidgets.QPushButton, 'SettingsButton')
+        self.NextPlotButton = self.findChild(QtWidgets.QPushButton, 'NextButton')
+        self.PrevPlotButton = self.findChild(QtWidgets.QPushButton, 'PrevButton')
+        self.NavPlotButton = self.findChild(QtWidgets.QPushButton, 'NavButton')
 
         # What to do if buttons are clicked
-        PauseButton.clicked.connect(self._pause_Clicked)
-        PlayButton.clicked.connect(self._play_Clicked)
-        SettingsButton.clicked.connect(self._buildPopup)
-        BackwardButton.clicked.connect(self._backward_Clicked)
-        ForwardButton.clicked.connect(self._forward_Clicked)
-        NextPlotButton.clicked.connect(self._nextPlot)
-
-        # Layout of GUI
-        grid = QGridLayout()
-        grid.setVerticalSpacing(5)
-
-        # Button layout
-        ButtonLayout = QVBoxLayout()
-        button_widget = QWidget()
-        button_widget.setLayout(ButtonLayout)
-        button_widget.setFixedWidth(100)
-
-        ButtonLayout.addWidget(BackwardButton) 
-        ButtonLayout.addWidget(PlayButton)
-        ButtonLayout.addWidget(PauseButton)
-        ButtonLayout.addWidget(ForwardButton)   
-        ButtonLayout.addWidget(SettingsButton)
-        ButtonLayout.addWidget(NextPlotButton)  
-
-        # Header layout
-        HeaderLogo = QLabel()
-        HeaderLogo.setPixmap(QPixmap('images/logo.jpg').scaled(150, 75, QtCore.Qt.KeepAspectRatio, QtCore.Qt.FastTransformation))
-
-        HeaderTitle = QLabel('Title',self)
-        HeaderTitle.setFont(QtGui.QFont("Arial",36))
-        
-        HeaderLayout = QHBoxLayout()
-        HeaderLayout.addWidget(HeaderLogo)
-        HeaderLayout.addWidget(HeaderTitle)
-
-        header_widget = QWidget()
-        header_widget.setLayout(HeaderLayout)
-        header_widget.setFixedHeight(75)
+        self.PauseButton.clicked.connect(self._pause_Clicked)
+        self.PlayButton.clicked.connect(self._play_Clicked)
+        self.SettingsButton.clicked.connect(self._buildSettings)
+        self.NavPlotButton.clicked.connect(self._buildNavPlot)
+        self.PrevPlotButton.clicked.connect(self._prevPlot)
+        self.NextPlotButton.clicked.connect(self._nextPlot)
 
         # Create figure for plotting and layout
         self.fig = Figure(figsize=(5, 3))
         self.dynamic_canvas = FigureCanvas(self.fig)
-        GraphLayout = QVBoxLayout()
-        GraphLayout.addWidget(self.dynamic_canvas)
-        graph_widget = QWidget()
-        graph_widget.setLayout(GraphLayout)
-
-        # Add widgets to GUI
-        grid.addWidget(header_widget,0,0)
-        grid.addWidget(graph_widget,1,0)
-        grid.addWidget(button_widget,1,1)
-        
-        # Set layout to main window
-        self.setLayout(grid)
+        self.GraphLayout = self.findChild(QtWidgets.QVBoxLayout, 'GraphLayout')
+        self.GraphLayout.addWidget(self.dynamic_canvas)
 
         # Plot
+        self.displayedPlot = 0
         self.maxvalue = 1
         self.minvalue = 0
         self.plot_data = []
-        self.max_length = 10
+        self.max_length = 20
         self.time = []
         self._dynamic_ax = self.dynamic_canvas.figure.subplots()
         self._timer = self.dynamic_canvas.new_timer(int(float(refreshTime)*1000), [(self._update_canvas, (), {})])
         self._timer.start()
-
+        IPlist = DiscoverDevicesIP()
+        ipAddress = IPlist[0]
+        self.name_list = getLogixDataNames("LogixName")
+    
     def _update_canvas(self):
+        
+        starttime = time.time()
         IPlist = DiscoverDevicesIP()
         if ipAddress not in IPlist:
             return
     
         self._dynamic_ax.clear()                                                  # clear graph
 
-        exportData()                                                             # Export new data
+        exportData(self.name_list)                                                # Export new data
         data, name, self.time = readData(self.max_length)
         
         self.plot_data = [float(item[self.displayedPlot]) for item in data] 
@@ -236,28 +165,27 @@ class MainWindow(QWidget):
 
         dataName = name[self.displayedPlot]
         
+        self._dynamic_ax.tick_params(axis='x', labelrotation = -90)
         self._dynamic_ax.set_ylim(minrange, maxrange)
         self._dynamic_ax.set_title("Graph of " + str(dataName) )#+ " from " + str(self.time[0]) + " to " + str(self.time[-1]))
         self._dynamic_ax.plot(self.time, self.plot_data)    # Set the data to draw
         self._dynamic_ax.figure.canvas.draw()               # Plot graph
         
-        #plt.ylim(self.minvalue, self.maxvalue)
-        #_updateRefreshTime(self)
+        endtime = time.time()
+        print("Execution time = " + str(endtime-starttime))
 
-
-    def _updateRefreshTime(self):
-        self._timer.stop()
-        self._timer = self.dynamic_canvas.new_timer(int(float(refreshTime)*1000), [(self._update_canvas, (), {})])
-        self._timer.start()
+    def _prevPlot(self):
+        self.displayedPlot = self.displayedPlot - 1
+        if self.displayedPlot < 0:
+            self.displayedPlot = numberOfTags
 
     def _nextPlot(self):
         self.displayedPlot = self.displayedPlot + 1
-        if self.displayedPlot > 4:
+        if self.displayedPlot > numberOfTags:
             self.displayedPlot = 0
 
-    def _buildPopup(self):
-        self.popup_window = Popup()
-        self.popup_window.show()
+    def _buildSettings(self):
+        self.popup_window = SettingsPopup()
 
     def _play_Clicked(self):
         print(_getLogixData(self))
@@ -265,18 +193,16 @@ class MainWindow(QWidget):
     def _pause_Clicked(self):
         print("pause")
 
-    def _backward_Clicked(self):
-        print("Backward")
+    def _buildNavPlot(self):
+        print("Nav")
 
-    def _forward_Clicked(self):
-        print("Forward")
 
 def readData(length):
     WorkingDirectory = os.path.dirname(os.path.abspath(__file__))           # Get the current working directory of the executable.
     os.chdir(WorkingDirectory + "/Log")                                     # Navigate to Log directory
 
     data = []
-    time = []
+    inputtime = []
 
     with open(currentLogFile, "r") as f:                # Open file for reading
         csvData = f.readlines()
@@ -286,7 +212,7 @@ def readData(length):
     csvData = [ item.strip() for item in csvData ]      # Remove end of line (\n) characters
     
     lines = [ item.split(";") for item in csvData ]    
-    time = [item[0] for item in lines]                  # Get all first elements of each sublists as time values
+    inputtime = [item[0] for item in lines]                  # Get all first elements of each sublists as time values
     
     for line in lines:
         del line[0]                                     # Delete all first elements of each sublists to save only data
@@ -295,14 +221,16 @@ def readData(length):
     csvName = csvName.strip()                           
     name = csvName.split(';')
     name.pop(0)                                         # Remove the first header (time)
-    return data, name, time
+
+    return data, name, inputtime
     
 
-def exportData():
+def exportData(name_list):
     global currentLogFile
     
-    datalist, dataNamelist = getLogixData()
-    time = str(datetime.datetime.now().strftime("%H:%M:%S"))                # Get actual time
+    datalist = getLogixData("LogixData")
+    currenttime = str(datetime.datetime.now().strftime("%H:%M:%S.%f"))                # Get actual time
+    currenttime = currenttime[:-4]
 
     WorkingDirectory = os.path.dirname(os.path.abspath(__file__))           # Get the current working directory of the executable.
     os.chdir(WorkingDirectory)
@@ -319,11 +247,11 @@ def exportData():
     CSVFileName = filetime + "_DataLog.csv"
 
     if CSVFileName not in csvFilesList:
-        writeCSVheader(dataNamelist, CSVFileName)
-        appendCSVrow(time, datalist, CSVFileName)
+        writeCSVheader(name_list, CSVFileName)
+        appendCSVrow(currenttime, datalist, CSVFileName)
         
     else:
-        appendCSVrow(time, datalist, CSVFileName)
+        appendCSVrow(currenttime, datalist, CSVFileName)
 
     currentLogFile = CSVFileName
     os.chdir(WorkingDirectory)
@@ -364,60 +292,33 @@ def DiscoverDevicesIP():
             IPList.append(device.IPAddress)
     return IPList
 
-def getCurrentTime():
-    now = datetime.datetime.now()
-    year = now.year
-    month = now.month
-    day = now.day
-    hour = now.hour
-    minute = now.minute
-    second = now.second
-    millisec = now.microsecond/1000
-    return year, month, day, hour, minute, second, millisec
 
-def getLogixData():
+def getLogixDataNames(TagName):
+
+    name_taglist = [ TagName +"["+str(x)+"]" for x in range(0,numberOfTags)]
+
+    with PLC() as comm:
+        comm.IPAddress = ipAddress      # Search for tags in the PLC at the current IP Address 
+        print(ipAddress)
+        print(name_taglist)
+        ret = comm.Read(name_taglist)   # Read name tags
+        dataName = [ response.Value for response in ret ]
+
+    return dataName
+
+def getLogixData(TagName):
     # gets data from the PLC at the entered ipAdress.
-    data_taglist = [ 'LogixData1',  'LogixData2','LogixData3','LogixData4','LogixData5'                   ]
-    name_taglist = [ 'LogixDataName1','LogixDataName2','LogixDataName3','LogixDataName4','LogixDataName5' ]
-
-    data = []
-    dataName = []
-
-    if simulation:
-        dataName = ["","","","",""]
-        while True:
-            data.append(simulate())
-            if len(data) == 5:
-                break
     
-    else:
-        with PLC() as comm:
-            comm.IPAddress = ipAddress      # Search for tags in the PLC at the current IP Address 
-            ret = comm.Read(data_taglist)   # Read data tags
-            print(ret)
-            for response in ret:
-                data.append(response.Value) 
-            ret = comm.Read(name_taglist)   # Read name tags
-            for response in ret:
-                dataName.append(response.Value)
+    data_taglist = [ TagName +"["+str(x)+"]" for x in range(0,numberOfTags)]
+    for x in range(0,numberOfTags):
+        data_taglist.append(TagName +"["+str(x)+"]")
 
-    return data, dataName
-   
+    with PLC() as comm:
+        comm.IPAddress = ipAddress      # Search for tags in the PLC at the current IP Address 
+        ret = comm.Read(data_taglist)   # Read data tags
+        data = [ response.Value for response in ret ]
 
-def createIconButton(iconStr, toolTipStr, iconSize):
-    button = QPushButton("")
-    button.setToolTip(toolTipStr)
-    button.setIcon(QtGui.QIcon(iconStr))
-    button.setIconSize(QtCore.QSize(iconSize,iconSize))
-    button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-    return button
-
-
-def createButton(text, toolTipStr, textsize):
-    button = QPushButton(text)
-    button.setFont(QtGui.QFont("Arial", textsize, QtGui.QFont.Bold))
-    button.setToolTip(toolTipStr)
-    return button
+    return data
 
 
 if __name__ == "__main__":

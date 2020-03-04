@@ -80,18 +80,16 @@ class SettingsPopup(QtWidgets.QDialog):
         global ipAddress
         global refreshTime
         global logPeriod
+        global numberOfTags
 
         if self.IPComboBox.currentText() != ipAddress:
             ipAddress = self.IPComboBox.currentText()
-
-        if self.TimeComboBox.currentText() != refreshTime:
-            refreshTime = self.TimeComboBox.currentText()
-
-        self.CurrentIP.setText(ipAddress)
-        self.CurrentRefTime.setText(str(refreshTime)+" sec")
-
+        if self.refreshTimeCB.currentText() != refreshTime:
+            refreshTime = self.refreshTimeCB.currentText()
         if self.LogComboBox.currentText() != logPeriod:
             logPeriod = self.LogComboBox.currentText()
+        if self.tagNumberCB.currentText() != numberOfTags:
+            numberOfTags = int(self.tagNumberCB.currentText())
 
         self.close()
 
@@ -138,7 +136,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._timer.start()
         IPlist = DiscoverDevicesIP()
         ipAddress = IPlist[0]
-        self.name_list = getLogixDataNames("LogixName")
+        self.name_list = getLogixData("LogixName")
     
     def _update_canvas(self):
         
@@ -148,8 +146,8 @@ class MainWindow(QtWidgets.QMainWindow):
             return
     
         self._dynamic_ax.clear()                                                  # clear graph
-
-        exportData(self.name_list)                                                # Export new data
+        datalist = getLogixData("LogixData")
+        exportData(datalist, self.name_list)                                                # Export new data
         data, name, self.time = readData(self.max_length)
         
         self.plot_data = [float(item[self.displayedPlot]) for item in data] 
@@ -181,7 +179,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _nextPlot(self):
         self.displayedPlot = self.displayedPlot + 1
-        if self.displayedPlot > numberOfTags:
+        if self.displayedPlot > numberOfTags-1:
             self.displayedPlot = 0
 
     def _buildSettings(self):
@@ -225,10 +223,9 @@ def readData(length):
     return data, name, inputtime
     
 
-def exportData(name_list):
+def exportData(data_list, name_list):
     global currentLogFile
     
-    datalist = getLogixData("LogixData")
     currenttime = str(datetime.datetime.now().strftime("%H:%M:%S.%f"))                # Get actual time
     currenttime = currenttime[:-4]
 
@@ -248,10 +245,10 @@ def exportData(name_list):
 
     if CSVFileName not in csvFilesList:
         writeCSVheader(name_list, CSVFileName)
-        appendCSVrow(currenttime, datalist, CSVFileName)
+        appendCSVrow(currenttime, data_list, CSVFileName)
         
     else:
-        appendCSVrow(currenttime, datalist, CSVFileName)
+        appendCSVrow(currenttime, data_list, CSVFileName)
 
     currentLogFile = CSVFileName
     os.chdir(WorkingDirectory)
@@ -259,8 +256,12 @@ def exportData(name_list):
 
 def writeCSVheader(NameList, FileName):
     HeaderRow = "Time"
+
+    if not isinstance(NameList, list): 
+        NameList = [ NameList ]
+
     for name in NameList:
-        HeaderRow = HeaderRow + ";" + name
+        HeaderRow += ";" + name
     HeaderRow = HeaderRow + "\n"
 
     f = open(FileName, "w+")
@@ -268,13 +269,16 @@ def writeCSVheader(NameList, FileName):
 
 def appendCSVrow(Time, DataList, FileName):
     DataRow = Time 
+
+    if not isinstance(DataList, list): 
+        DataList = [ DataList ]
+
     for Data in DataList:
-        DataRow = DataRow + ";" + str(Data)
-    DataRow = DataRow + "\n"
-    
+        DataRow += ";" + str(Data)
+    DataRow += "\n"
+
     with open(FileName, "a") as f:
         f.write(DataRow)
-
 
 def simulate():
     return random.random()              # Simulate random data
@@ -292,32 +296,12 @@ def DiscoverDevicesIP():
             IPList.append(device.IPAddress)
     return IPList
 
-
-def getLogixDataNames(TagName):
-
-    name_taglist = [ TagName +"["+str(x)+"]" for x in range(0,numberOfTags)]
-
-    with PLC() as comm:
-        comm.IPAddress = ipAddress      # Search for tags in the PLC at the current IP Address 
-        print(ipAddress)
-        print(name_taglist)
-        ret = comm.Read(name_taglist)   # Read name tags
-        dataName = [ response.Value for response in ret ]
-
-    return dataName
-
 def getLogixData(TagName):
     # gets data from the PLC at the entered ipAdress.
-    
-    data_taglist = [ TagName +"["+str(x)+"]" for x in range(0,numberOfTags)]
-    for x in range(0,numberOfTags):
-        data_taglist.append(TagName +"["+str(x)+"]")
-
     with PLC() as comm:
         comm.IPAddress = ipAddress      # Search for tags in the PLC at the current IP Address 
-        ret = comm.Read(data_taglist)   # Read data tags
-        data = [ response.Value for response in ret ]
-
+        ret = comm.Read(TagName,numberOfTags)   # Read data tags
+        data = ret.Value
     return data
 
 

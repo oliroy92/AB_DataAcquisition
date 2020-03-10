@@ -1,6 +1,5 @@
 import sys
 import os
-import re
 import time
 import datetime
 
@@ -18,11 +17,9 @@ from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2
 from matplotlib.figure import Figure
 import matplotlib.ticker
 
-from PyQt5 import QtWidgets, uic
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QGridLayout
-from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QSizePolicy, QInputDialog, QLineEdit, QLabel, QComboBox
+from PyQt5 import uic
+from PyQt5.QtWidgets import *
 from PyQt5 import QtGui, QtCore
-from PyQt5.QtGui import QPixmap
 
 # Global variables initialisation
 
@@ -31,9 +28,13 @@ global refreshTime
 global simulation
 global logPeriod
 global currentLogFile
-global numberOfTags
+global numberOfTrends
+global displayedTrend
+global dataScaling
 
-numberOfTags = 1
+dataScaling = "Auto"
+displayedTrend = 0
+numberOfTrends = 1
 currentLogFile = "log.csv"
 simulation = False
 ipAddress = "0.0.0.0"
@@ -46,41 +47,82 @@ class SettingsPopup(QtWidgets.QDialog):
         super(SettingsPopup, self).__init__()
         uic.loadUi(os.path.dirname(os.path.abspath(__file__)) +  "\\SettingsPopup.ui",self)
         self.show()
-        self.initUI()
+        self._initUI()
 
-    def initUI(self):
+    def _initUI(self):
+            # ------ LEFT PANEL: App and export Settings -------
+        # Change IP Address Combo Box
         self.IPComboBox = self.findChild(QtWidgets.QComboBox, 'CB_ipAddress')
         IPlist = DiscoverDevicesIP()
         self.IPComboBox.addItems(IPlist)
-        self.IPComboBox.setCurrentIndex(IPlist.index(ipAddress))
+        if ipAddress in IPlist:
+            self.IPComboBox.setCurrentIndex(IPlist.index(ipAddress))
 
+        # Current IP Address Label
+        self.labelIP = self.findChild(QtWidgets.QLabel, 'LB_IP')
+        self.labelIP.setText(ipAddress)
+
+        # Refresh Time Combo Box
         self.refreshTimeCB = self.findChild(QtWidgets.QComboBox, 'CB_refreshTime')
         Items = ["0.5","1","2","5","10","30","60","120","300","600"]
         self.refreshTimeCB.addItems(Items)
         self.refreshTimeCB.setCurrentIndex(Items.index(refreshTime))
 
-        applyButton = self.findChild(QtWidgets.QPushButton, 'PB_Apply')
-        applyButton.clicked.connect(self.ApplyChanges)
-
-        cancelButton = self.findChild(QtWidgets.QPushButton, 'PB_Cancel')
-        cancelButton.clicked.connect(self.close)
-
-        self.tagNumberCB = self.findChild(QtWidgets.QComboBox, 'CB_tagNumber')
+        # Number of trends Combo Box
+        self.trendNumberCB = self.findChild(QtWidgets.QComboBox, 'CB_tagNumber')
         Items = [ "1","2","3","4","5","6","7","8","9","10",
                   "11","12","13","14","15","16","17","18","19","20" ]
-        self.tagNumberCB.addItems(Items)
-        self.tagNumberCB.setCurrentIndex(Items.index(str(numberOfTags)))
+        self.trendNumberCB.addItems(Items)
+        self.trendNumberCB.setCurrentIndex(Items.index(str(numberOfTrends)))
 
+        # Log Time Combo Box
         self.LogComboBox = self.findChild(QtWidgets.QComboBox, 'CB_logPeriod')
         Items = ["1 Day","7 Days","14 Days","1 Month"]
         self.LogComboBox.addItems(Items)
         self.LogComboBox.setCurrentIndex(Items.index(logPeriod))
 
-    def ApplyChanges(self):
+        # Apply and Cancel Buttons
+        applyButton = self.findChild(QtWidgets.QPushButton, 'PB_Apply')
+        applyButton.clicked.connect(self._applyChanges)
+        cancelButton = self.findChild(QtWidgets.QPushButton, 'PB_Cancel')
+        cancelButton.clicked.connect(self.close)
+
+            # ------ RIGHT PANEL: Trend Settings -------
+        # Previous and Next Trend Buttons
+        nextTrendButton = self.findChild(QtWidgets.QPushButton, "PB_nextTrend")
+        nextTrendButton.clicked.connect(self._nextTrendSettings)
+        prevTrendButton = self.findChild(QtWidgets.QPushButton, "PB_prevTrend")
+        prevTrendButton.clicked.connect(self._prevTrendSettings)
+
+        # Displayed Trend Settings
+        displayedTrendSettings = self.findChild(QtWidgets.QLabel, "LB_trendNumber")
+
+        # Data Scaling Radio Buttons:
+        dataScalingAuto = self.findChild(QtWidgets.QRadioButton, "RB_Auto")
+        dataScalingPreset = self.findChild(QtWidgets.QRadioButton, "RB_Preset")
+        if dataScaling == "Auto":
+            dataScalingAuto.setChecked(True)
+        else:
+            dataScalingPreset.setChecked(True)
+
+        # Data Axis Scaling Max input
+        self.dataScalingMax = self.findChild(QtWidgets.QLineEdit, "LE_yAxisMax")
+        self.dataScalingMax.hide()
+        self.LB_dataScalingMax = self.findChild(QtWidgets.QLabel, "LB_yAxisMax")
+        self.LB_dataScalingMax.hide()
+
+        # Data Axis Scaling Max input
+        self.dataScalingMin = self.findChild(QtWidgets.QLineEdit, "LE_yAxisMin")
+        self.dataScalingMin.hide()
+        self.LB_dataScalingMin = self.findChild(QtWidgets.QLabel, "LB_yAxisMin")
+        self.LB_dataScalingMin.hide()
+        
+
+    def _applyChanges(self):
         global ipAddress
         global refreshTime
         global logPeriod
-        global numberOfTags
+        global numberOfTrends
 
         if self.IPComboBox.currentText() != ipAddress:
             ipAddress = self.IPComboBox.currentText()
@@ -88,10 +130,16 @@ class SettingsPopup(QtWidgets.QDialog):
             refreshTime = self.refreshTimeCB.currentText()
         if self.LogComboBox.currentText() != logPeriod:
             logPeriod = self.LogComboBox.currentText()
-        if self.tagNumberCB.currentText() != numberOfTags:
-            numberOfTags = int(self.tagNumberCB.currentText())
+        if self.trendNumberCB.currentText() != numberOfTrends:
+            numberOfTrends = int(self.trendNumberCB.currentText())
 
         self.close()
+
+    def _nextTrendSettings(self):
+        print("next Trend")
+    
+    def _prevTrendSettings(self):
+        print("prev Trend")
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -125,7 +173,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.GraphLayout.addWidget(self.dynamic_canvas)
 
         # Plot
-        self.displayedPlot = 0
         self.maxvalue = 1
         self.minvalue = 0
         self.plot_data = []
@@ -134,23 +181,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self._dynamic_ax = self.dynamic_canvas.figure.subplots()
         self._timer = self.dynamic_canvas.new_timer(int(float(refreshTime)*1000), [(self._update_canvas, (), {})])
         self._timer.start()
-        IPlist = DiscoverDevicesIP()
-        ipAddress = IPlist[0]
-        self.name_list = getLogixData("LogixName")
+        self.IPlist = DiscoverDevicesIP()
+        self.name_list = []
     
     def _update_canvas(self):
-        
-        starttime = time.time()
-        IPlist = DiscoverDevicesIP()
-        if ipAddress not in IPlist:
+        if ipAddress not in self.IPlist:
             return
+
+        self.name_list = getLogixData("LogixName")
+        starttime = time.time()
     
         self._dynamic_ax.clear()                                                  # clear graph
         datalist = getLogixData("LogixData")
         exportData(datalist, self.name_list)                                                # Export new data
         data, name, self.time = readData(self.max_length)
         
-        self.plot_data = [float(item[self.displayedPlot]) for item in data] 
+        self.plot_data = [float(item[displayedTrend]) for item in data] 
         
         if max(self.plot_data) > self.maxvalue:
             self.maxvalue = max(self.plot_data)
@@ -161,7 +207,7 @@ class MainWindow(QtWidgets.QMainWindow):
         minrange = self.minvalue - (0.1*rangedifferential)
         maxrange = self.maxvalue + (0.1*rangedifferential)
 
-        dataName = name[self.displayedPlot]
+        dataName = name[displayedTrend]
         
         self._dynamic_ax.tick_params(axis='x', labelrotation = -90)
         self._dynamic_ax.set_ylim(minrange, maxrange)
@@ -170,23 +216,31 @@ class MainWindow(QtWidgets.QMainWindow):
         self._dynamic_ax.figure.canvas.draw()               # Plot graph
         
         endtime = time.time()
-        print("Execution time = " + str(endtime-starttime))
+        exec_time = endtime-starttime
+        print(exec_time)
+        timerPreset = (float(refreshTime) - exec_time)
+        self._timer.stop()
+        self._timer = self.dynamic_canvas.new_timer(timerPreset*1000, [(self._update_canvas, (), {})])
+        self._timer.start()
 
     def _prevPlot(self):
-        self.displayedPlot = self.displayedPlot - 1
-        if self.displayedPlot < 0:
-            self.displayedPlot = numberOfTags
+        global displayedTrend
+
+        displayedTrend -= 1
+        if displayedTrend < 0:
+            displayedTrend = numberOfTrends-1
 
     def _nextPlot(self):
-        self.displayedPlot = self.displayedPlot + 1
-        if self.displayedPlot > numberOfTags-1:
-            self.displayedPlot = 0
+        global displayedTrend
+        displayedTrend += 1
+        if displayedTrend > numberOfTrends-1:
+            displayedTrend = 0
 
     def _buildSettings(self):
         self.popup_window = SettingsPopup()
 
     def _play_Clicked(self):
-        print(_getLogixData(self))
+        print("play")
 
     def _pause_Clicked(self):
         print("pause")
@@ -202,15 +256,15 @@ def readData(length):
     data = []
     inputtime = []
 
-    with open(currentLogFile, "r") as f:                # Open file for reading
+    with open(currentLogFile, "r") as f:                # Open file for reading and read all lines in file
         csvData = f.readlines()
     csvName = csvData[0]                                # Save the first line as the header
-    csvData.pop(0)                                      # Remove the first line (header)
+    csvData.pop(0)                                      # Remove the first line (header) from the read data
     csvData = csvData[-length:]                         # Keep only last "length" elements of the list (number of lines)
     csvData = [ item.strip() for item in csvData ]      # Remove end of line (\n) characters
     
-    lines = [ item.split(";") for item in csvData ]    
-    inputtime = [item[0] for item in lines]                  # Get all first elements of each sublists as time values
+    lines = [ item.split(";") for item in csvData ]     # Split each lines into sublists
+    inputtime = [item[0] for item in lines]             # Get all first elements of each sublists as time values
     
     for line in lines:
         del line[0]                                     # Delete all first elements of each sublists to save only data
@@ -300,7 +354,7 @@ def getLogixData(TagName):
     # gets data from the PLC at the entered ipAdress.
     with PLC() as comm:
         comm.IPAddress = ipAddress      # Search for tags in the PLC at the current IP Address 
-        ret = comm.Read(TagName,numberOfTags)   # Read data tags
+        ret = comm.Read(TagName,20)   # Read data tags
         data = ret.Value
     return data
 

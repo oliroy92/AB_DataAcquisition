@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import time
 import datetime
 
@@ -21,31 +22,31 @@ from PyQt5 import uic
 from PyQt5.QtWidgets import *
 from PyQt5 import QtGui, QtCore
 
-# Global variables initialisation
-
-global ipAddress 
-global refreshTime
-global simulation
-global logPeriod
-global currentLogFile
-global numberOfTrends
-global displayedTrend
-global dataScaling
-
-dataScaling = "Auto"
-displayedTrend = 0
-numberOfTrends = 1
-currentLogFile = "log.csv"
-simulation = False
-ipAddress = "0.0.0.0"
-refreshTime = "1"
-logPeriod = "1 Month"
 plt.style.use('dark_background')
 
+class trendSettings:
+    dataScaling = "Auto"
+    dataScalingMax = 10
+    dataScalingMin = 0
+    dataToDisplay = ""
+    minmaxMode = "Disabled"
+    minValue = 0
+    maxValue = 0
+
+class appSettings:
+    displayedTrend = 0
+    numberOfTrends = 1
+    currentLogFile = "log.csv"
+    ipAddress = "0.0.0.0"
+    refreshTime = "1"
+    logPeriod = "1 Month"    
+
 class SettingsPopup(QtWidgets.QDialog):
-    def __init__(self):
+    def __init__(self, trendSet, appSet):
         super(SettingsPopup, self).__init__()
         uic.loadUi(os.path.dirname(os.path.abspath(__file__)) +  "\\SettingsPopup.ui",self)
+        self.trendSet = trendSet
+        self.appSet = appSet
         self.show()
         self._initUI()
 
@@ -55,31 +56,32 @@ class SettingsPopup(QtWidgets.QDialog):
         self.IPComboBox = self.findChild(QtWidgets.QComboBox, 'CB_ipAddress')
         IPlist = DiscoverDevicesIP()
         self.IPComboBox.addItems(IPlist)
-        if ipAddress in IPlist:
-            self.IPComboBox.setCurrentIndex(IPlist.index(ipAddress))
+        if self.appSet.ipAddress in IPlist:
+            self.IPComboBox.setCurrentIndex(IPlist.index(self.appSet.ipAddress))
 
         # Current IP Address Label
         self.labelIP = self.findChild(QtWidgets.QLabel, 'LB_IP')
-        self.labelIP.setText(ipAddress)
+        self.labelIP.setText(self.appSet.ipAddress)
 
         # Refresh Time Combo Box
         self.refreshTimeCB = self.findChild(QtWidgets.QComboBox, 'CB_refreshTime')
         Items = ["0.5","1","2","5","10","30","60","120","300","600"]
         self.refreshTimeCB.addItems(Items)
-        self.refreshTimeCB.setCurrentIndex(Items.index(refreshTime))
+        self.refreshTimeCB.setCurrentIndex(Items.index(self.appSet.refreshTime))
 
         # Number of trends Combo Box
         self.trendNumberCB = self.findChild(QtWidgets.QComboBox, 'CB_tagNumber')
         Items = [ "1","2","3","4","5","6","7","8","9","10",
                   "11","12","13","14","15","16","17","18","19","20" ]
         self.trendNumberCB.addItems(Items)
-        self.trendNumberCB.setCurrentIndex(Items.index(str(numberOfTrends)))
+        self.trendNumberCB.setCurrentIndex(Items.index(str(self.appSet.numberOfTrends)))
+        self.trendNumberCB.currentIndexChanged.connect(self._updateTrends)
 
         # Log Time Combo Box
         self.LogComboBox = self.findChild(QtWidgets.QComboBox, 'CB_logPeriod')
         Items = ["1 Day","7 Days","14 Days","1 Month"]
         self.LogComboBox.addItems(Items)
-        self.LogComboBox.setCurrentIndex(Items.index(logPeriod))
+        self.LogComboBox.setCurrentIndex(Items.index(self.appSet.logPeriod))
 
         # Apply and Cancel Buttons
         applyButton = self.findChild(QtWidgets.QPushButton, 'PB_Apply')
@@ -95,47 +97,105 @@ class SettingsPopup(QtWidgets.QDialog):
         prevTrendButton.clicked.connect(self._prevTrendSettings)
 
         # Displayed Trend Settings
-        displayedTrendSettings = self.findChild(QtWidgets.QLabel, "LB_trendNumber")
-
+        self.displayedTrendSettings = self.findChild(QtWidgets.QLabel, "LB_trendNumber")
+        
         # Data Scaling Radio Buttons:
-        dataScalingAuto = self.findChild(QtWidgets.QRadioButton, "RB_Auto")
-        dataScalingPreset = self.findChild(QtWidgets.QRadioButton, "RB_Preset")
-        if dataScaling == "Auto":
-            dataScalingAuto.setChecked(True)
-        else:
-            dataScalingPreset.setChecked(True)
+        self.dataScalingAuto = self.findChild(QtWidgets.QRadioButton, "RB_Auto")
+        self.dataScalingPreset = self.findChild(QtWidgets.QRadioButton, "RB_Preset")
+        self.dataScalingAuto.toggled.connect(self._togglehide)
 
         # Data Axis Scaling Max input
         self.dataScalingMax = self.findChild(QtWidgets.QLineEdit, "LE_yAxisMax")
-        self.dataScalingMax.hide()
         self.LB_dataScalingMax = self.findChild(QtWidgets.QLabel, "LB_yAxisMax")
-        self.LB_dataScalingMax.hide()
 
-        # Data Axis Scaling Max input
+        # Data Axis Scaling Min input
         self.dataScalingMin = self.findChild(QtWidgets.QLineEdit, "LE_yAxisMin")
-        self.dataScalingMin.hide()
         self.LB_dataScalingMin = self.findChild(QtWidgets.QLabel, "LB_yAxisMin")
-        self.LB_dataScalingMin.hide()
+
+        # Minimum & Maximum Mode
+        self.CB_minmaxLimit = self.findChild(QtWidgets.QComboBox, "CB_minMax")
+        self.minmaxItems = ["Maximum", "Minimum", "Maximum & Minimum", "Disabled"]
+        self.CB_minmaxLimit.addItems(self.minmaxItems)
+        self.CB_minmaxLimit.currentTextChanged.connect(self._togglehide)
+
+        # Maximum value
+        self.LE_maxValue = self.findChild(QtWidgets.QLineEdit, "LE_dataMax")
+        self.LB_maxValue = self.findChild(QtWidgets.QLabel, "LB_dataMax")
+
+        # Minimum value
+        self.LE_minValue = self.findChild(QtWidgets.QLineEdit, "LE_dataMin")
+        self.LB_minValue = self.findChild(QtWidgets.QLabel, "LB_dataMin") 
+        self._updateTrendSettings()
+        self._togglehide()
+
+    def _updateTrendSettings(self):
+        self.displayedTrendSettings.setText("Trend #" + str(self.appSet.displayedTrend + 1) )
         
+        if self.trendSet[self.appSet.displayedTrend].dataScaling == "Auto":
+            self.dataScalingAuto.setChecked(True)
+        else:
+            self.dataScalingPreset.setChecked(True)
+            self.dataScalingMax.setText(self.trendSet[self.appSet.displayedTrend].dataScalingMax)
+            self.dataScalingMin.setText(self.trendSet[self.appSet.displayedTrend].dataScalingMin)
+        
+        self.CB_minmaxLimit.setCurrentIndex(self.minmaxItems.index(self.trendSet[self.appSet.displayedTrend].minmaxMode))
+        
+    def _updateTrends(self):
+        # Updates the number of trends settings to adjust for the selected number of trends
+        if int(self.trendNumberCB.currentText()) > self.appSet.numberOfTrends:
+            while len(self.trendSet) != int(self.trendNumberCB.currentText()):
+                self.trendSet.append(trendSettings())
+        elif int(self.trendNumberCB.currentText()) < self.appSet.numberOfTrends:
+            while len(self.trendSet) != int(self.trendNumberCB.currentText()):
+                self.trendSet.pop()
+
+    def _togglehide(self):
+        if self.dataScalingAuto.isChecked():
+            self.LB_dataScalingMax.hide()
+            self.dataScalingMax.hide()
+            self.LB_dataScalingMin.hide()
+            self.dataScalingMin.hide()
+        else:
+            self.LB_dataScalingMax.show()
+            self.dataScalingMax.show()
+            self.LB_dataScalingMin.show()
+            self.dataScalingMin.show()       
+        
+        if self.CB_minmaxLimit.currentText() == "Disabled":
+            self.LB_minValue.hide()
+            self.LE_minValue.hide()
+            self.LB_maxValue.hide()
+            self.LE_maxValue.hide()
+        elif self.CB_minmaxLimit.currentText() == "Minimum":
+            self.LB_minValue.show()
+            self.LE_minValue.show()
+            self.LB_maxValue.hide()
+            self.LE_maxValue.hide()
+        elif self.CB_minmaxLimit.currentText() == "Maximum":
+            self.LB_maxValue.show()
+            self.LE_maxValue.show()
+            self.LB_minValue.hide()
+            self.LE_minValue.hide()
+        else:
+            self.LB_minValue.show()
+            self.LE_minValue.show()
+            self.LB_maxValue.show()
+            self.LE_maxValue.show()
 
     def _applyChanges(self):
-        global ipAddress
-        global refreshTime
-        global logPeriod
-        global numberOfTrends
-
-        if self.IPComboBox.currentText() != ipAddress:
-            ipAddress = self.IPComboBox.currentText()
-        if self.refreshTimeCB.currentText() != refreshTime:
-            refreshTime = self.refreshTimeCB.currentText()
-        if self.LogComboBox.currentText() != logPeriod:
-            logPeriod = self.LogComboBox.currentText()
-        if self.trendNumberCB.currentText() != numberOfTrends:
-            numberOfTrends = int(self.trendNumberCB.currentText())
+        if self.IPComboBox.currentText() != self.appSet.ipAddress:
+            self.appSet.ipAddress = self.IPComboBox.currentText()
+        if self.refreshTimeCB.currentText() != self.appSet.refreshTime:
+            self.appSet.refreshTime = self.refreshTimeCB.currentText()
+        if self.LogComboBox.currentText() != self.appSet.logPeriod:
+            self.appSet.logPeriod = self.LogComboBox.currentText()
+        if self.trendNumberCB.currentText() != self.appSet.numberOfTrends:
+            self.appSet.numberOfTrends = int(self.trendNumberCB.currentText())
 
         self.close()
 
     def _nextTrendSettings(self):
+        
         print("next Trend")
     
     def _prevTrendSettings(self):
@@ -145,10 +205,11 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super(MainWindow,self).__init__()
         uic.loadUi('MainWindow.ui',self)
+        self.appSet = appSettings()
         self.initUI()
     
     def initUI(self):
-        global ipAddress
+        self.trendSet = [ trendSettings() ]
 
         # Find buttons in the UI
         self.PauseButton = self.findChild(QtWidgets.QPushButton, 'PauseButton')
@@ -179,24 +240,24 @@ class MainWindow(QtWidgets.QMainWindow):
         self.max_length = 20
         self.time = []
         self._dynamic_ax = self.dynamic_canvas.figure.subplots()
-        self._timer = self.dynamic_canvas.new_timer(int(float(refreshTime)*1000), [(self._update_canvas, (), {})])
+        self._timer = self.dynamic_canvas.new_timer(int(float(self.appSet.refreshTime)*1000), [(self._update_canvas, (), {})])
         self._timer.start()
         self.IPlist = DiscoverDevicesIP()
         self.name_list = []
     
     def _update_canvas(self):
-        if ipAddress not in self.IPlist:
+        if self.appSet.ipAddress not in self.IPlist:
             return
 
-        self.name_list = getLogixData("LogixName")
+        self.name_list = getLogixData("LogixName", self.appSet.ipAddress)
         starttime = time.time()
     
         self._dynamic_ax.clear()                                                  # clear graph
-        datalist = getLogixData("LogixData")
+        datalist = getLogixData("LogixData", self.appSet.ipAddress)
         exportData(datalist, self.name_list)                                                # Export new data
         data, name, self.time = readData(self.max_length)
         
-        self.plot_data = [float(item[displayedTrend]) for item in data] 
+        self.plot_data = [float(item[self.appSet.displayedTrend]) for item in data] 
         
         if max(self.plot_data) > self.maxvalue:
             self.maxvalue = max(self.plot_data)
@@ -211,33 +272,29 @@ class MainWindow(QtWidgets.QMainWindow):
         
         self._dynamic_ax.tick_params(axis='x', labelrotation = -90)
         self._dynamic_ax.set_ylim(minrange, maxrange)
-        self._dynamic_ax.set_title("Graph of " + str(dataName) )#+ " from " + str(self.time[0]) + " to " + str(self.time[-1]))
-        self._dynamic_ax.plot(self.time, self.plot_data)    # Set the data to draw
-        self._dynamic_ax.figure.canvas.draw()               # Plot graph
+        self._dynamic_ax.set_title("Graph of " + str(dataName) ) 
+        self._dynamic_ax.plot(self.time, self.plot_data)            # Set the data to draw
+        self._dynamic_ax.figure.canvas.draw()                       # Plot graph
         
         endtime = time.time()
         exec_time = endtime-starttime
-        print(exec_time)
-        timerPreset = (float(refreshTime) - exec_time)
+        timerPreset = (float(self.appSet.refreshTime) - exec_time)
         self._timer.stop()
         self._timer = self.dynamic_canvas.new_timer(timerPreset*1000, [(self._update_canvas, (), {})])
         self._timer.start()
 
     def _prevPlot(self):
-        global displayedTrend
-
-        displayedTrend -= 1
-        if displayedTrend < 0:
-            displayedTrend = numberOfTrends-1
+        self.appSet.displayedTrend -= 1
+        if self.appSet.displayedTrend < 0:
+            self.appSet.displayedTrend = self.appSet.numberOfTrends-1
 
     def _nextPlot(self):
-        global displayedTrend
-        displayedTrend += 1
-        if displayedTrend > numberOfTrends-1:
-            displayedTrend = 0
+        self.appSet.displayedTrend += 1
+        if self.appSet.displayedTrend > self.appSet.numberOfTrends-1:
+            self.appSet.displayedTrend = 0
 
     def _buildSettings(self):
-        self.popup_window = SettingsPopup()
+        self.popup_window = SettingsPopup(self.trendSet, self.appSet)
 
     def _play_Clicked(self):
         print("play")
@@ -350,7 +407,7 @@ def DiscoverDevicesIP():
             IPList.append(device.IPAddress)
     return IPList
 
-def getLogixData(TagName):
+def getLogixData(TagName, ipAddress):
     # gets data from the PLC at the entered ipAdress.
     with PLC() as comm:
         comm.IPAddress = ipAddress      # Search for tags in the PLC at the current IP Address 

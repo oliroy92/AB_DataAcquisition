@@ -41,6 +41,122 @@ class appSettings:
     refreshTime = "1"
     logPeriod = "1 Month"    
 
+class NumericInputKB(QtWidgets.QDialog):
+    def __init__(self):
+        super(NumericInputKB, self).__init__()
+        uic.loadUi(os.path.dirname(os.path.abspath(__file__)) +  "\\numericInput.ui",self)
+        self.show()
+        self._initUI()
+
+    def _initUI(self):
+        self.LB_Input = self.findChild(QtWidgets.QLabel, "LB_Input")
+        self.LB_Input.setText("0")
+        # Numeric inputs push buttons (0-9 and .)
+        PB0 = self.findChild(QtWidgets.QPushButton, "PB0")
+        PB0.clicked.connect(self.PB0_Pressed)
+        PB1 = self.findChild(QtWidgets.QPushButton, "PB1")
+        PB1.clicked.connect(self.PB1_Pressed)
+        PB2 = self.findChild(QtWidgets.QPushButton, "PB2")
+        PB2.clicked.connect(self.PB2_Pressed)
+        PB3 = self.findChild(QtWidgets.QPushButton, "PB3")
+        PB3.clicked.connect(self.PB3_Pressed)
+        PB4 = self.findChild(QtWidgets.QPushButton, "PB4")
+        PB4.clicked.connect(self.PB4_Pressed)
+        PB5 = self.findChild(QtWidgets.QPushButton, "PB5")
+        PB5.clicked.connect(self.PB5_Pressed)
+
+        self.PB_Sign = self.findChild(QtWidgets.QPushButton, "PB_Sign")
+        self.PB_Sign.clicked.connect(self._SignPressed)
+        self.PB_Enter = self.findChild(QtWidgets.QPushButton, "PB_Enter")
+        self.PB_Enter.clicked.connect(self._EnterPressed)
+        self.PB_Clear = self.findChild(QtWidgets.QPushButton, "PB_Clear")
+        self.PB_Enter.clicked.connect(self._ClearPressed)
+        
+
+    def PB0_Pressed(self):
+        text = self.LB_Input.text()
+        if text == "0":
+                return
+        elif len(text) >= 8:
+                return
+        else:
+            text += "0"
+        self.LB_Input.setText(text)
+    
+    def PB1_Pressed(self):
+        text = self.LB_Input.text()
+        if text == "0":
+            text = "1"
+        elif len(text) >= 8:
+            return
+        else:
+            text += "1"
+        self.LB_Input.setText(text)
+    
+    def PB2_Pressed(self):
+        text = self.LB_Input.text()
+        if text == "0":
+            text = "2"
+        elif len(text) >= 8:
+            return
+        else:
+            text += "2"
+        self.LB_Input.setText(text)
+
+    def PB3_Pressed(self):
+        text = self.LB_Input.text()
+        if text == "0":
+            text = "3"
+        elif len(text) >= 8:
+            return
+        else:
+            text += "3"
+        self.LB_Input.setText(text)    
+
+    def PB4_Pressed(self):
+        text = self.LB_Input.text()
+        if text == "0":
+            text = "4"
+        elif len(text) >= 8:
+            return
+        else:
+            text += "4"
+        self.LB_Input.setText(text)
+
+    def PB5_Pressed(self):
+        text = self.LB_Input.text()
+        if text == "0":
+            text = "5"
+        elif len(text) >= 8:
+            return
+        else:
+            text += "5"
+        self.LB_Input.setText(text)
+    
+    def getNumericValue(self):
+        return self.LB_Input.text()
+
+    def _EnterPressed(self):
+        self.accept()
+
+    def _SignPressed(self):
+        text = self.LB_Input.text()
+        if text[0] == "-":
+            text.pop(0)
+        else:
+            text.insert(0,"-")
+        self.LB_Input.setText(text)
+
+
+    def _ClearPressed(self):
+        self.LB_Input.setText("0")
+
+    def _ErasePressed(self):
+        text = self.LB_Input.text()
+        text.pop()
+        self.LB_Input.setText(text)
+        
+
 class SettingsPopup(QtWidgets.QDialog):
     def __init__(self, trendSet, appSet):
         super(SettingsPopup, self).__init__()
@@ -105,11 +221,11 @@ class SettingsPopup(QtWidgets.QDialog):
         self.dataScalingAuto.toggled.connect(self._togglehide)
 
         # Data Axis Scaling Max input
-        self.dataScalingMax = self.findChild(QtWidgets.QLineEdit, "LE_yAxisMax")
+        self.PB_dataScalingMax = self.findChild(QtWidgets.QPushButton, "PB_yAxisMax")
         self.LB_dataScalingMax = self.findChild(QtWidgets.QLabel, "LB_yAxisMax")
 
         # Data Axis Scaling Min input
-        self.dataScalingMin = self.findChild(QtWidgets.QLineEdit, "LE_yAxisMin")
+        self.PB_dataScalingMin = self.findChild(QtWidgets.QPushButton, "PB_yAxisMin")
         self.LB_dataScalingMin = self.findChild(QtWidgets.QLabel, "LB_yAxisMin")
 
         # Minimum & Maximum Mode
@@ -119,14 +235,22 @@ class SettingsPopup(QtWidgets.QDialog):
         self.CB_minmaxLimit.currentTextChanged.connect(self._togglehide)
 
         # Maximum value
-        self.LE_maxValue = self.findChild(QtWidgets.QLineEdit, "LE_dataMax")
+        self.PB_maxValue = self.findChild(QtWidgets.QPushButton, "PB_dataMax")
+        self.PB_maxValue.clicked.connect(self.getNumericValue)
         self.LB_maxValue = self.findChild(QtWidgets.QLabel, "LB_dataMax")
 
         # Minimum value
-        self.LE_minValue = self.findChild(QtWidgets.QLineEdit, "LE_dataMin")
+        self.PB_minValue = self.findChild(QtWidgets.QPushButton, "PB_dataMin")
+        self.PB_minValue.clicked.connect(self.getNumericValue)
         self.LB_minValue = self.findChild(QtWidgets.QLabel, "LB_dataMin") 
+
         self._updateTrendSettings()
         self._togglehide()
+
+    def getNumericValue(self):
+        numeric_keyboard = NumericInputKB()
+        if numeric_keyboard.exec_():
+            print(numeric_keyboard.getNumericValue())
 
     def _updateTrendSettings(self):
         self.displayedTrendSettings.setText("Trend #" + str(self.appSet.displayedTrend + 1) )
@@ -135,8 +259,8 @@ class SettingsPopup(QtWidgets.QDialog):
             self.dataScalingAuto.setChecked(True)
         else:
             self.dataScalingPreset.setChecked(True)
-            self.dataScalingMax.setText(self.trendSet[self.appSet.displayedTrend].dataScalingMax)
-            self.dataScalingMin.setText(self.trendSet[self.appSet.displayedTrend].dataScalingMin)
+            self.dataScalingMax.setPlaceholderText(self.trendSet[self.appSet.displayedTrend].dataScalingMax)
+            self.dataScalingMin.setPlaceholderText(self.trendSet[self.appSet.displayedTrend].dataScalingMin)
         
         self.CB_minmaxLimit.setCurrentIndex(self.minmaxItems.index(self.trendSet[self.appSet.displayedTrend].minmaxMode))
         
@@ -152,35 +276,35 @@ class SettingsPopup(QtWidgets.QDialog):
     def _togglehide(self):
         if self.dataScalingAuto.isChecked():
             self.LB_dataScalingMax.hide()
-            self.dataScalingMax.hide()
+            self.PB_dataScalingMax.hide()
             self.LB_dataScalingMin.hide()
-            self.dataScalingMin.hide()
+            self.PB_dataScalingMin.hide()
         else:
             self.LB_dataScalingMax.show()
-            self.dataScalingMax.show()
+            self.PB_dataScalingMax.show()
             self.LB_dataScalingMin.show()
-            self.dataScalingMin.show()       
+            self.PB_dataScalingMin.show()       
         
         if self.CB_minmaxLimit.currentText() == "Disabled":
             self.LB_minValue.hide()
-            self.LE_minValue.hide()
+            self.PB_minValue.hide()
             self.LB_maxValue.hide()
-            self.LE_maxValue.hide()
+            self.PB_maxValue.hide()
         elif self.CB_minmaxLimit.currentText() == "Minimum":
             self.LB_minValue.show()
-            self.LE_minValue.show()
+            self.PB_minValue.show()
             self.LB_maxValue.hide()
-            self.LE_maxValue.hide()
+            self.PB_maxValue.hide()
         elif self.CB_minmaxLimit.currentText() == "Maximum":
             self.LB_maxValue.show()
-            self.LE_maxValue.show()
+            self.PB_maxValue.show()
             self.LB_minValue.hide()
-            self.LE_minValue.hide()
+            self.PB_minValue.hide()
         else:
             self.LB_minValue.show()
-            self.LE_minValue.show()
+            self.PB_minValue.show()
             self.LB_maxValue.show()
-            self.LE_maxValue.show()
+            self.PB_maxValue.show()
 
     def _applyChanges(self):
         if self.IPComboBox.currentText() != self.appSet.ipAddress:

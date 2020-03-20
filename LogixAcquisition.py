@@ -1,14 +1,9 @@
-import sys
-import os
+import sys, os
 import re
-import time
-import datetime
+import time, datetime
 
 from pylogix import PLC
-import random
 
-import pandas
-from pandas.io.excel import ExcelWriter
 import csv
 import glob
 
@@ -18,9 +13,11 @@ from matplotlib.backends.backend_qt5agg import (FigureCanvas, NavigationToolbar2
 from matplotlib.figure import Figure
 import matplotlib.ticker
 
-from PyQt5 import uic
+from PyQt5 import QtWidgets, uic
 from PyQt5.QtWidgets import *
-from PyQt5 import QtGui, QtCore
+#from PyQt5 import QtGui, QtCore
+
+from NumericKB import Input as KB
 
 plt.style.use('dark_background')
 
@@ -40,186 +37,6 @@ class appSettings:
     ipAddress = "0.0.0.0"
     refreshTime = "1"
     logPeriod = "1 Month"    
-
-class NumericInputKB(QtWidgets.QDialog):
-    def __init__(self):
-        super(NumericInputKB, self).__init__()
-        uic.loadUi(os.path.dirname(os.path.abspath(__file__)) +  "\\numericInput.ui",self)
-        self.show()
-        self._initUI()
-
-    def _initUI(self):
-        self.LB_Input = self.findChild(QtWidgets.QLabel, "LB_Input")
-        self.LB_Input.setText("0")
-        # Numeric inputs push buttons (0-9 and .)
-        PB0 = self.findChild(QtWidgets.QPushButton, "PB0")
-        PB0.clicked.connect(self.PB0_Pressed)
-        PB1 = self.findChild(QtWidgets.QPushButton, "PB1")
-        PB1.clicked.connect(self.PB1_Pressed)
-        PB2 = self.findChild(QtWidgets.QPushButton, "PB2")
-        PB2.clicked.connect(self.PB2_Pressed)
-        PB3 = self.findChild(QtWidgets.QPushButton, "PB3")
-        PB3.clicked.connect(self.PB3_Pressed)
-        PB4 = self.findChild(QtWidgets.QPushButton, "PB4")
-        PB4.clicked.connect(self.PB4_Pressed)
-        PB5 = self.findChild(QtWidgets.QPushButton, "PB5")
-        PB5.clicked.connect(self.PB5_Pressed)
-        PB6 = self.findChild(QtWidgets.QPushButton, "PB6")
-        PB6.clicked.connect(self.PB6_Pressed)
-        PB7 = self.findChild(QtWidgets.QPushButton, "PB7")
-        PB7.clicked.connect(self.PB7_Pressed)
-        PB8 = self.findChild(QtWidgets.QPushButton, "PB8")
-        PB8.clicked.connect(self.PB8_Pressed)
-        PB9 = self.findChild(QtWidgets.QPushButton, "PB9")
-        PB9.clicked.connect(self.PB9_Pressed)
-        PBDot = self.findChild(QtWidgets.QPushButton, "PB_Dot")
-        PBDot.clicked.connect(self.PBDot_Pressed)
-
-        self.PB_Sign = self.findChild(QtWidgets.QPushButton, "PB_Sign")
-        self.PB_Sign.clicked.connect(self._SignPressed)
-        self.PB_Enter = self.findChild(QtWidgets.QPushButton, "PB_Enter")
-        self.PB_Enter.clicked.connect(self._EnterPressed)
-        self.PB_Clear = self.findChild(QtWidgets.QPushButton, "PB_Clear")
-        self.PB_Clear.clicked.connect(self._ClearPressed)
-        self.PB_Backspace = self.findChild(QtWidgets.QPushButton, "PB_Backspace")
-        self.PB_Backspace.clicked.connect(self._ErasePressed)
-        
-
-    def PB0_Pressed(self):
-        text = self.LB_Input.text()
-        if text == "0":
-                return
-        elif len(text) >= 8:
-                return
-        else:
-            text += "0"
-        self.LB_Input.setText(text)
-    
-    def PB1_Pressed(self):
-        text = self.LB_Input.text()
-        if text == "0":
-            text = "1"
-        elif len(text) >= 8:
-            return
-        else:
-            text += "1"
-        self.LB_Input.setText(text)
-    
-    def PB2_Pressed(self):
-        text = self.LB_Input.text()
-        if text == "0":
-            text = "2"
-        elif len(text) >= 8:
-            return
-        else:
-            text += "2"
-        self.LB_Input.setText(text)
-
-    def PB3_Pressed(self):
-        text = self.LB_Input.text()
-        if text == "0":
-            text = "3"
-        elif len(text) >= 8:
-            return
-        else:
-            text += "3"
-        self.LB_Input.setText(text)    
-
-    def PB4_Pressed(self):
-        text = self.LB_Input.text()
-        if text == "0":
-            text = "4"
-        elif len(text) >= 8:
-            return
-        else:
-            text += "4"
-        self.LB_Input.setText(text)
-
-    def PB5_Pressed(self):
-        text = self.LB_Input.text()
-        if text == "0":
-            text = "5"
-        elif len(text) >= 8:
-            return
-        else:
-            text += "5"
-        self.LB_Input.setText(text)
-    
-    def PB6_Pressed(self):
-        text = self.LB_Input.text()
-        if text == "0":
-            text = "6"
-        elif len(text) >= 8:
-            return
-        else:
-            text += "6"
-        self.LB_Input.setText(text)
-
-    def PB7_Pressed(self):
-        text = self.LB_Input.text()
-        if text == "0":
-            text = "7"
-        elif len(text) >= 8:
-            return
-        else:
-            text += "7"
-        self.LB_Input.setText(text)
-    
-    def PB8_Pressed(self):
-        text = self.LB_Input.text()
-        if text == "0":
-            text = "8"
-        elif len(text) >= 8:
-            return
-        else:
-            text += "8"
-        self.LB_Input.setText(text)
-
-    def PB9_Pressed(self):
-        text = self.LB_Input.text()
-        if text == "0":
-            text = "9"
-        elif len(text) >= 8:
-            return
-        else:
-            text += "9"
-        self.LB_Input.setText(text)
-
-    def PBDot_Pressed(self):
-        text = self.LB_Input.text()
-        if "." in text:
-            return
-        elif len(text) >= 8:
-            return
-        else:
-            text += "."
-        self.LB_Input.setText(text)
-
-    def _EnterPressed(self):
-        self.InputText = self.LB_Input.text()
-        self.accept()
-
-    def _SignPressed(self):
-        text = self.LB_Input.text()
-        if "-" in text:
-            text = text[1:]
-        else:
-            if text == "0":
-                return
-            else:
-                text = "-" + text
-        self.LB_Input.setText(text)
-
-    def _ClearPressed(self):
-        self.LB_Input.setText("0")
-
-    def _ErasePressed(self):
-        text = self.LB_Input.text()
-        text = text[:-1]
-        if text == "":
-            self.LB_Input.setText("0")
-        else:
-            self.LB_Input.setText(text)
 
 class SettingsPopup(QtWidgets.QDialog):
     def __init__(self, trendSet, appSet):
@@ -317,11 +134,21 @@ class SettingsPopup(QtWidgets.QDialog):
         
         self.CB_minmaxLimit.setCurrentIndex(self.minmaxItems.index(self.trendSet[self.appSet.displayedTrend].minmaxMode))
         self._updateTrendSettings()
-        self._togglehide()
+
+    def _nextTrendSettings(self):
+        self.appSet.displayedTrend += 1
+        if self.appSet.displayedTrend > self.appSet.numberOfTrends-1:
+            self.appSet.displayedTrend = 0
+        self._updateTrendSettings()
+    
+    def _prevTrendSettings(self):
+        self.appSet.displayedTrend -= 1
+        if self.appSet.displayedTrend < 0:
+            self.appSet.displayedTrend = self.appSet.numberOfTrends-1
+        self._updateTrendSettings()
 
     def _toggleScalingMode(self):
         self._updateTrendSettings()
-        self._togglehide()
 
     def _changeScalingMax(self):
         self.PB_dataScalingMax.setText(self._getNumericValue())
@@ -336,7 +163,7 @@ class SettingsPopup(QtWidgets.QDialog):
         self.PB_minValue.setText(self._getNumericValue())
 
     def _getNumericValue(self):
-        numeric_keyboard = NumericInputKB()
+        numeric_keyboard = KB()
         if numeric_keyboard.exec_():
             return numeric_keyboard.InputText
 
@@ -348,6 +175,8 @@ class SettingsPopup(QtWidgets.QDialog):
 
         self.PB_maxValue.setText(str(self.trendSet[self.appSet.displayedTrend].maxValue))
         self.PB_minValue.setText(str(self.trendSet[self.appSet.displayedTrend].minValue))
+
+        self._togglehide()
 
         
     def _updateTrends(self):
@@ -414,12 +243,6 @@ class SettingsPopup(QtWidgets.QDialog):
             self.trendSet[self.appSet.displayedTrend].dataScaling = "Preset"
 
         self.close()
-
-    def _nextTrendSettings(self):
-        print("next Trend")
-    
-    def _prevTrendSettings(self):
-        print("prev Trend")
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):

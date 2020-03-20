@@ -340,7 +340,7 @@ border-color: rgb(75, 75, 75);</string>
     <enum>QFrame::StyledPanel</enum>
    </property>
    <property name="text">
-    <string>######.#</string>
+    <string>#########.#</string>
    </property>
    <property name="alignment">
     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>

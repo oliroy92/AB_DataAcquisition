@@ -64,13 +64,25 @@ class NumericInputKB(QtWidgets.QDialog):
         PB4.clicked.connect(self.PB4_Pressed)
         PB5 = self.findChild(QtWidgets.QPushButton, "PB5")
         PB5.clicked.connect(self.PB5_Pressed)
+        PB6 = self.findChild(QtWidgets.QPushButton, "PB6")
+        PB6.clicked.connect(self.PB6_Pressed)
+        PB7 = self.findChild(QtWidgets.QPushButton, "PB7")
+        PB7.clicked.connect(self.PB7_Pressed)
+        PB8 = self.findChild(QtWidgets.QPushButton, "PB8")
+        PB8.clicked.connect(self.PB8_Pressed)
+        PB9 = self.findChild(QtWidgets.QPushButton, "PB9")
+        PB9.clicked.connect(self.PB9_Pressed)
+        PBDot = self.findChild(QtWidgets.QPushButton, "PB_Dot")
+        PBDot.clicked.connect(self.PBDot_Pressed)
 
         self.PB_Sign = self.findChild(QtWidgets.QPushButton, "PB_Sign")
         self.PB_Sign.clicked.connect(self._SignPressed)
         self.PB_Enter = self.findChild(QtWidgets.QPushButton, "PB_Enter")
         self.PB_Enter.clicked.connect(self._EnterPressed)
         self.PB_Clear = self.findChild(QtWidgets.QPushButton, "PB_Clear")
-        self.PB_Enter.clicked.connect(self._ClearPressed)
+        self.PB_Clear.clicked.connect(self._ClearPressed)
+        self.PB_Backspace = self.findChild(QtWidgets.QPushButton, "PB_Backspace")
+        self.PB_Backspace.clicked.connect(self._ErasePressed)
         
 
     def PB0_Pressed(self):
@@ -133,29 +145,81 @@ class NumericInputKB(QtWidgets.QDialog):
             text += "5"
         self.LB_Input.setText(text)
     
-    def getNumericValue(self):
-        return self.LB_Input.text()
+    def PB6_Pressed(self):
+        text = self.LB_Input.text()
+        if text == "0":
+            text = "6"
+        elif len(text) >= 8:
+            return
+        else:
+            text += "6"
+        self.LB_Input.setText(text)
+
+    def PB7_Pressed(self):
+        text = self.LB_Input.text()
+        if text == "0":
+            text = "7"
+        elif len(text) >= 8:
+            return
+        else:
+            text += "7"
+        self.LB_Input.setText(text)
+    
+    def PB8_Pressed(self):
+        text = self.LB_Input.text()
+        if text == "0":
+            text = "8"
+        elif len(text) >= 8:
+            return
+        else:
+            text += "8"
+        self.LB_Input.setText(text)
+
+    def PB9_Pressed(self):
+        text = self.LB_Input.text()
+        if text == "0":
+            text = "9"
+        elif len(text) >= 8:
+            return
+        else:
+            text += "9"
+        self.LB_Input.setText(text)
+
+    def PBDot_Pressed(self):
+        text = self.LB_Input.text()
+        if "." in text:
+            return
+        elif len(text) >= 8:
+            return
+        else:
+            text += "."
+        self.LB_Input.setText(text)
 
     def _EnterPressed(self):
+        self.InputText = self.LB_Input.text()
         self.accept()
 
     def _SignPressed(self):
         text = self.LB_Input.text()
-        if text[0] == "-":
-            text.pop(0)
+        if "-" in text:
+            text = text[1:]
         else:
-            text.insert(0,"-")
+            if text == "0":
+                return
+            else:
+                text = "-" + text
         self.LB_Input.setText(text)
-
 
     def _ClearPressed(self):
         self.LB_Input.setText("0")
 
     def _ErasePressed(self):
         text = self.LB_Input.text()
-        text.pop()
-        self.LB_Input.setText(text)
-        
+        text = text[:-1]
+        if text == "":
+            self.LB_Input.setText("0")
+        else:
+            self.LB_Input.setText(text)
 
 class SettingsPopup(QtWidgets.QDialog):
     def __init__(self, trendSet, appSet):
@@ -218,14 +282,16 @@ class SettingsPopup(QtWidgets.QDialog):
         # Data Scaling Radio Buttons:
         self.dataScalingAuto = self.findChild(QtWidgets.QRadioButton, "RB_Auto")
         self.dataScalingPreset = self.findChild(QtWidgets.QRadioButton, "RB_Preset")
-        self.dataScalingAuto.toggled.connect(self._togglehide)
+        self.dataScalingAuto.toggled.connect(self._toggleScalingMode)
 
         # Data Axis Scaling Max input
         self.PB_dataScalingMax = self.findChild(QtWidgets.QPushButton, "PB_yAxisMax")
+        self.PB_dataScalingMax.clicked.connect(self._changeScalingMax)
         self.LB_dataScalingMax = self.findChild(QtWidgets.QLabel, "LB_yAxisMax")
 
         # Data Axis Scaling Min input
         self.PB_dataScalingMin = self.findChild(QtWidgets.QPushButton, "PB_yAxisMin")
+        self.PB_dataScalingMin.clicked.connect(self._changeScalingMin)
         self.LB_dataScalingMin = self.findChild(QtWidgets.QLabel, "LB_yAxisMin")
 
         # Minimum & Maximum Mode
@@ -236,33 +302,53 @@ class SettingsPopup(QtWidgets.QDialog):
 
         # Maximum value
         self.PB_maxValue = self.findChild(QtWidgets.QPushButton, "PB_dataMax")
-        self.PB_maxValue.clicked.connect(self.getNumericValue)
+        self.PB_maxValue.clicked.connect(self._changeMaxValue)
         self.LB_maxValue = self.findChild(QtWidgets.QLabel, "LB_dataMax")
 
         # Minimum value
         self.PB_minValue = self.findChild(QtWidgets.QPushButton, "PB_dataMin")
-        self.PB_minValue.clicked.connect(self.getNumericValue)
+        self.PB_minValue.clicked.connect(self._changeMinValue)
         self.LB_minValue = self.findChild(QtWidgets.QLabel, "LB_dataMin") 
 
-        self._updateTrendSettings()
-        self._togglehide()
-
-    def getNumericValue(self):
-        numeric_keyboard = NumericInputKB()
-        if numeric_keyboard.exec_():
-            print(numeric_keyboard.getNumericValue())
-
-    def _updateTrendSettings(self):
-        self.displayedTrendSettings.setText("Trend #" + str(self.appSet.displayedTrend + 1) )
-        
         if self.trendSet[self.appSet.displayedTrend].dataScaling == "Auto":
             self.dataScalingAuto.setChecked(True)
         else:
             self.dataScalingPreset.setChecked(True)
-            self.dataScalingMax.setPlaceholderText(self.trendSet[self.appSet.displayedTrend].dataScalingMax)
-            self.dataScalingMin.setPlaceholderText(self.trendSet[self.appSet.displayedTrend].dataScalingMin)
         
         self.CB_minmaxLimit.setCurrentIndex(self.minmaxItems.index(self.trendSet[self.appSet.displayedTrend].minmaxMode))
+        self._updateTrendSettings()
+        self._togglehide()
+
+    def _toggleScalingMode(self):
+        self._updateTrendSettings()
+        self._togglehide()
+
+    def _changeScalingMax(self):
+        self.PB_dataScalingMax.setText(self._getNumericValue())
+
+    def _changeScalingMin(self):
+        self.PB_dataScalingMin.setText(self._getNumericValue())
+
+    def _changeMaxValue(self):
+        self.PB_maxValue.setText(self._getNumericValue())
+
+    def _changeMinValue(self):
+        self.PB_minValue.setText(self._getNumericValue())
+
+    def _getNumericValue(self):
+        numeric_keyboard = NumericInputKB()
+        if numeric_keyboard.exec_():
+            return numeric_keyboard.InputText
+
+    def _updateTrendSettings(self):
+        self.displayedTrendSettings.setText("Trend #" + str(self.appSet.displayedTrend + 1) )
+        
+        self.PB_dataScalingMax.setText(str(self.trendSet[self.appSet.displayedTrend].dataScalingMax))
+        self.PB_dataScalingMin.setText(str(self.trendSet[self.appSet.displayedTrend].dataScalingMin))
+
+        self.PB_maxValue.setText(str(self.trendSet[self.appSet.displayedTrend].maxValue))
+        self.PB_minValue.setText(str(self.trendSet[self.appSet.displayedTrend].minValue))
+
         
     def _updateTrends(self):
         # Updates the number of trends settings to adjust for the selected number of trends
@@ -316,10 +402,20 @@ class SettingsPopup(QtWidgets.QDialog):
         if self.trendNumberCB.currentText() != self.appSet.numberOfTrends:
             self.appSet.numberOfTrends = int(self.trendNumberCB.currentText())
 
+        self.trendSet[self.appSet.displayedTrend].dataScalingMax = float(self.PB_dataScalingMax.text())
+        self.trendSet[self.appSet.displayedTrend].dataScalingMin = float(self.PB_dataScalingMin.text())
+        self.trendSet[self.appSet.displayedTrend].maxValue = float(self.PB_maxValue.text())
+        self.trendSet[self.appSet.displayedTrend].minValue = float(self.PB_minValue.text())
+
+        self.trendSet[self.appSet.displayedTrend].minmaxMode  = self.CB_minmaxLimit.currentText()
+        if self.dataScalingAuto.isChecked():
+            self.trendSet[self.appSet.displayedTrend].dataScaling = "Auto"
+        else:
+            self.trendSet[self.appSet.displayedTrend].dataScaling = "Preset"
+
         self.close()
 
     def _nextTrendSettings(self):
-        
         print("next Trend")
     
     def _prevTrendSettings(self):

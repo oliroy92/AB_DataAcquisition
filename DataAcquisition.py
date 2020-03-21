@@ -15,7 +15,6 @@ import matplotlib.ticker
 
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtWidgets import *
-#from PyQt5 import QtGui, QtCore
 
 from NumericKB import Input as KB
 
@@ -49,16 +48,10 @@ class SettingsPopup(QtWidgets.QDialog):
 
     def _initUI(self):
             # ------ LEFT PANEL: App and export Settings -------
-        # Change IP Address Combo Box
-        self.IPComboBox = self.findChild(QtWidgets.QComboBox, 'CB_ipAddress')
-        IPlist = DiscoverDevicesIP()
-        self.IPComboBox.addItems(IPlist)
-        if self.appSet.ipAddress in IPlist:
-            self.IPComboBox.setCurrentIndex(IPlist.index(self.appSet.ipAddress))
-
-        # Current IP Address Label
-        self.labelIP = self.findChild(QtWidgets.QLabel, 'LB_IP')
-        self.labelIP.setText(self.appSet.ipAddress)
+        # Change IP Address Push Button
+        self.PB_ip = self.findChild(QtWidgets.QPushButton, 'PB_ipAddress')
+        self.PB_ip.clicked.connect(self._changeIP)
+        self.PB_ip.setText(self.appSet.ipAddress)
 
         # Refresh Time Combo Box
         self.refreshTimeCB = self.findChild(QtWidgets.QComboBox, 'CB_refreshTime')
@@ -127,6 +120,20 @@ class SettingsPopup(QtWidgets.QDialog):
         self.PB_minValue.clicked.connect(self._changeMinValue)
         self.LB_minValue = self.findChild(QtWidgets.QLabel, "LB_dataMin") 
 
+        # Selected data
+        self.data_PB = []
+        dataList = []
+        if self.trendSet[self.appSet.displayedTrend].dataToDisplay:
+            dataList = self.trendSet[self.appSet.displayedTrend].dataToDisplay.split(",")
+        for x in range(1,20):
+            self.data_PB.append(self.findChild(QtWidgets.QPushButton, "PB_d"+ str(x)))
+        for i,PB in enumerate(self.data_PB):
+            if dataList:
+                if str(i+1) in dataList:
+                    PB.setChecked(True)
+            PB.clicked.connect(self._pressedDataPB(i))
+
+        # Initializing:
         if self.trendSet[self.appSet.displayedTrend].dataScaling == "Auto":
             self.dataScalingAuto.setChecked(True)
         else:
@@ -134,6 +141,15 @@ class SettingsPopup(QtWidgets.QDialog):
         
         self.CB_minmaxLimit.setCurrentIndex(self.minmaxItems.index(self.trendSet[self.appSet.displayedTrend].minmaxMode))
         self._updateTrendSettings()
+
+    def _pressedDataPB(self,i):
+        def togglePB():
+            print(self.data_PB[i].isChecked())
+            if not self.data_PB[i].isChecked():
+                self.data_PB[i].setChecked(False)
+            elif self.data_PB[i].isChecked():
+                self.data_PB[i].setChecked(True)
+        return togglePB
 
     def _nextTrendSettings(self):
         self.appSet.displayedTrend += 1
@@ -150,6 +166,14 @@ class SettingsPopup(QtWidgets.QDialog):
     def _toggleScalingMode(self):
         self._updateTrendSettings()
 
+    def _changeIP(self):
+        numeric_keyboard = KB()
+        if numeric_keyboard.exec_():
+            ipInput = numeric_keyboard.InputText
+            splitIP = ipInput.split(".")
+            if len(splitIP) == 4:
+                self.PB_ip.setText(ipInput)
+            
     def _changeScalingMax(self):
         self.PB_dataScalingMax.setText(self._getNumericValue())
 
@@ -165,7 +189,9 @@ class SettingsPopup(QtWidgets.QDialog):
     def _getNumericValue(self):
         numeric_keyboard = KB()
         if numeric_keyboard.exec_():
-            return numeric_keyboard.InputText
+            numericInput = numeric_keyboard.InputText
+        if numericInput:
+            return numericInput
 
     def _updateTrendSettings(self):
         self.displayedTrendSettings.setText("Trend #" + str(self.appSet.displayedTrend + 1) )
@@ -222,8 +248,9 @@ class SettingsPopup(QtWidgets.QDialog):
             self.PB_maxValue.show()
 
     def _applyChanges(self):
-        if self.IPComboBox.currentText() != self.appSet.ipAddress:
-            self.appSet.ipAddress = self.IPComboBox.currentText()
+        # Apply application settings
+        if self.PB_ip.text() != self.appSet.ipAddress:
+            self.appSet.ipAddress = self.PB_ip.text()
         if self.refreshTimeCB.currentText() != self.appSet.refreshTime:
             self.appSet.refreshTime = self.refreshTimeCB.currentText()
         if self.LogComboBox.currentText() != self.appSet.logPeriod:
@@ -231,6 +258,7 @@ class SettingsPopup(QtWidgets.QDialog):
         if self.trendNumberCB.currentText() != self.appSet.numberOfTrends:
             self.appSet.numberOfTrends = int(self.trendNumberCB.currentText())
 
+        # Apply displayed trend settings
         self.trendSet[self.appSet.displayedTrend].dataScalingMax = float(self.PB_dataScalingMax.text())
         self.trendSet[self.appSet.displayedTrend].dataScalingMin = float(self.PB_dataScalingMin.text())
         self.trendSet[self.appSet.displayedTrend].maxValue = float(self.PB_maxValue.text())
@@ -242,7 +270,9 @@ class SettingsPopup(QtWidgets.QDialog):
         else:
             self.trendSet[self.appSet.displayedTrend].dataScaling = "Preset"
 
+
         self.close()
+
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -285,19 +315,24 @@ class MainWindow(QtWidgets.QMainWindow):
         self._dynamic_ax = self.dynamic_canvas.figure.subplots()
         self._timer = self.dynamic_canvas.new_timer(int(float(self.appSet.refreshTime)*1000), [(self._update_canvas, (), {})])
         self._timer.start()
-        self.IPlist = DiscoverDevicesIP()
-        self.name_list = []
-    
+
+        self.commError = False
+
     def _update_canvas(self):
-        if self.appSet.ipAddress not in self.IPlist:
+        if self.appSet.ipAddress == "0.0.0.0":
+            return
+        
+        name_list = getLogixData("LogixName", self.appSet.ipAddress)
+        if name_list == -1:
+            self.appSet.ipAddress = "0.0.0.0"
             return
 
-        self.name_list = getLogixData("LogixName", self.appSet.ipAddress)
         starttime = time.time()
     
         self._dynamic_ax.clear()                                                  # clear graph
         datalist = getLogixData("LogixData", self.appSet.ipAddress)
-        exportData(datalist, self.name_list)                                                # Export new data
+        
+        exportData(datalist, name_list)                                                # Export new data
         data, name, self.time = readData(self.max_length)
         
         self.plot_data = [float(item[self.appSet.displayedTrend]) for item in data] 
@@ -442,19 +477,15 @@ def getPLCtime():
         ret = comm.GetPLCTime()         # Get PLC date and time.
     return ret
 
-def DiscoverDevicesIP():
-    IPList = []
-    with PLC() as comm:
-        devices = comm.Discover()       # Discover devices on Ethernet/IP network.
-        for device in devices.Value:    
-            IPList.append(device.IPAddress)
-    return IPList
-
 def getLogixData(TagName, ipAddress):
     # gets data from the PLC at the entered ipAdress.
     with PLC() as comm:
         comm.IPAddress = ipAddress      # Search for tags in the PLC at the current IP Address 
-        ret = comm.Read(TagName,20)   # Read data tags
+        try:
+            ret = comm.Read(TagName,20)   # Read data tags
+        except:
+            data = -1
+            return data
         data = ret.Value
     return data
 

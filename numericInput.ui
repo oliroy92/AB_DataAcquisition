@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>370</width>
+    <width>368</width>
     <height>480</height>
    </rect>
   </property>
@@ -329,7 +329,7 @@
    </property>
    <property name="font">
     <font>
-     <pointsize>32</pointsize>
+     <pointsize>22</pointsize>
     </font>
    </property>
    <property name="styleSheet">
@@ -340,7 +340,7 @@ border-color: rgb(75, 75, 75);</string>
     <enum>QFrame::StyledPanel</enum>
    </property>
    <property name="text">
-    <string>#########.#</string>
+    <string>###############</string>
    </property>
    <property name="alignment">
     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>

@@ -129,7 +129,7 @@ class SettingsPopup(QtWidgets.QDialog):
             self.data_PB.append(self.findChild(QtWidgets.QPushButton, "PB_d"+ str(x)))
         for i,PB in enumerate(self.data_PB):
             if dataList:
-                if str(i+1) in dataList:
+                if str(i) in dataList:
                     PB.setChecked(True)
             PB.clicked.connect(self._pressedDataPB(i))
 
@@ -270,6 +270,11 @@ class SettingsPopup(QtWidgets.QDialog):
         else:
             self.trendSet[self.appSet.displayedTrend].dataScaling = "Preset"
 
+        data = ""
+        for i,PB in enumerate(self.data_PB):
+            if PB.isChecked():
+                data += str(i) + ","
+        self.trendSet[self.appSet.displayedTrend].dataToDisplay = data[:-1]
 
         self.close()
 

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>910</width>
-    <height>528</height>
+    <height>530</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -131,7 +131,8 @@
     </font>
    </property>
    <property name="styleSheet">
-    <string notr="true">background-color: rgb(238, 238, 238);</string>
+    <string notr="true">background-color: rgb(238, 238, 238);
+selection-color: rgb(238, 238, 238);</string>
    </property>
   </widget>
   <widget class="QLabel" name="LB_refreshTime">
@@ -177,7 +178,8 @@
     </font>
    </property>
    <property name="styleSheet">
-    <string notr="true">background-color: rgb(238, 238, 238);</string>
+    <string notr="true">background-color: rgb(238, 238, 238);
+selection-color: rgb(238, 238, 238);</string>
    </property>
   </widget>
   <widget class="QLabel" name="LB_logPeriod">
@@ -223,7 +225,8 @@
     </font>
    </property>
    <property name="styleSheet">
-    <string notr="true">background-color: rgb(238, 238, 238);</string>
+    <string notr="true">background-color: rgb(238, 238, 238);
+selection-color: rgb(238, 238, 238);</string>
    </property>
   </widget>
   <widget class="QPushButton" name="PB_Apply">
@@ -420,7 +423,7 @@ color: rgb(0, 0, 0);</string>
    </property>
    <property name="styleSheet">
     <string notr="true">background-color: rgb(238, 238, 238);
-alternate-background-color: rgb(238, 238, 238);</string>
+selection-color: rgb(238, 238, 238);</string>
    </property>
   </widget>
   <widget class="QLabel" name="LB_dataAxisScale">

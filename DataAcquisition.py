@@ -190,7 +190,6 @@ class SettingsPopup(QtWidgets.QDialog):
         numeric_keyboard = KB()
         if numeric_keyboard.exec_():
             numericInput = numeric_keyboard.InputText
-        if numericInput:
             return numericInput
 
     def _updateTrendSettings(self):
@@ -334,12 +333,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         starttime = time.time()
     
-        self._dynamic_ax.clear()                                                  # clear graph
         datalist = getLogixData("LogixData", self.appSet.ipAddress)
-        
         exportData(datalist, name_list)                                                # Export new data
+
         data, name, self.time = readData(self.max_length)
-        
+        self._dynamic_ax.clear()                                                  # clear graph
         self.plot_data = [float(item[self.appSet.displayedTrend]) for item in data] 
         
         if max(self.plot_data) > self.maxvalue:

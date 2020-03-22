@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>864</width>
-    <height>708</height>
+    <height>715</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -36,6 +36,31 @@
     </sizepolicy>
    </property>
    <layout class="QGridLayout" name="gridLayout">
+    <item row="1" column="0" rowspan="2">
+     <widget class="QWidget" name="widget" native="true">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>530</height>
+       </size>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_2">
+       <item row="0" column="0">
+        <layout class="QVBoxLayout" name="GraphLayout">
+         <property name="sizeConstraint">
+          <enum>QLayout::SetMinimumSize</enum>
+         </property>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </item>
     <item row="0" column="0">
      <layout class="QHBoxLayout" name="HeaderLayout">
       <property name="sizeConstraint">
@@ -52,13 +77,31 @@
         <property name="sizeHint" stdset="0">
          <size>
           <width>400</width>
-          <height>20</height>
+          <height>0</height>
          </size>
         </property>
        </spacer>
       </item>
       <item>
        <widget class="QLabel" name="HeaderTitle">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>150</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>150</width>
+          <height>150</height>
+         </size>
+        </property>
         <property name="palette">
          <palette>
           <active>
@@ -503,11 +546,14 @@
         </property>
         <property name="font">
          <font>
-          <pointsize>36</pointsize>
+          <pointsize>32</pointsize>
          </font>
         </property>
         <property name="text">
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;TITLE&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
         </property>
        </widget>
       </item>
@@ -522,7 +568,7 @@
         <property name="sizeHint" stdset="0">
          <size>
           <width>300</width>
-          <height>20</height>
+          <height>0</height>
          </size>
         </property>
        </spacer>
@@ -531,8 +577,8 @@
        <widget class="QLabel" name="HeaderLogo">
         <property name="maximumSize">
          <size>
-          <width>150</width>
-          <height>100</height>
+          <width>100</width>
+          <height>65</height>
          </size>
         </property>
         <property name="text">
@@ -547,31 +593,6 @@
        </widget>
       </item>
      </layout>
-    </item>
-    <item row="1" column="0" rowspan="2">
-     <widget class="QWidget" name="widget" native="true">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="minimumSize">
-       <size>
-        <width>0</width>
-        <height>500</height>
-       </size>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_2">
-       <item row="0" column="0">
-        <layout class="QVBoxLayout" name="GraphLayout">
-         <property name="sizeConstraint">
-          <enum>QLayout::SetMinimumSize</enum>
-         </property>
-        </layout>
-       </item>
-      </layout>
-     </widget>
     </item>
     <item row="3" column="0">
      <layout class="QHBoxLayout" name="ButtonLayout">
@@ -605,7 +626,7 @@
         <property name="maximumSize">
          <size>
           <width>16777215</width>
-          <height>100</height>
+          <height>80</height>
          </size>
         </property>
         <property name="font">
@@ -614,7 +635,7 @@
          </font>
         </property>
         <property name="styleSheet">
-         <string notr="true">background-color: rgb(141, 141, 141);</string>
+         <string notr="true">background-color: rgb(238, 238, 238);</string>
         </property>
         <property name="text">
          <string>NAVIGATE
@@ -639,7 +660,7 @@ PLOT</string>
         <property name="maximumSize">
          <size>
           <width>16777215</width>
-          <height>100</height>
+          <height>80</height>
          </size>
         </property>
         <property name="font">
@@ -648,7 +669,7 @@ PLOT</string>
          </font>
         </property>
         <property name="styleSheet">
-         <string notr="true">background-color: rgb(141, 141, 141);</string>
+         <string notr="true">background-color: rgb(238, 238, 238);</string>
         </property>
         <property name="text">
          <string>PREVIOUS
@@ -667,11 +688,11 @@ PLOT</string>
         <property name="maximumSize">
          <size>
           <width>16777215</width>
-          <height>100</height>
+          <height>80</height>
          </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">background-color: rgb(141, 141, 141);</string>
+         <string notr="true">background-color: rgb(238, 238, 238);</string>
         </property>
         <property name="text">
          <string/>
@@ -699,7 +720,7 @@ PLOT</string>
         <property name="maximumSize">
          <size>
           <width>16777215</width>
-          <height>100</height>
+          <height>80</height>
          </size>
         </property>
         <property name="font">
@@ -708,7 +729,7 @@ PLOT</string>
          </font>
         </property>
         <property name="styleSheet">
-         <string notr="true">background-color: rgb(141, 141, 141);</string>
+         <string notr="true">background-color: rgb(238, 238, 238);</string>
         </property>
         <property name="text">
          <string/>
@@ -736,7 +757,7 @@ PLOT</string>
         <property name="maximumSize">
          <size>
           <width>16777215</width>
-          <height>100</height>
+          <height>80</height>
          </size>
         </property>
         <property name="font">
@@ -745,7 +766,7 @@ PLOT</string>
          </font>
         </property>
         <property name="styleSheet">
-         <string notr="true">background-color: rgb(141, 141, 141);</string>
+         <string notr="true">background-color: rgb(238, 238, 238);</string>
         </property>
         <property name="text">
          <string>NEXT
@@ -764,11 +785,11 @@ PLOT</string>
         <property name="maximumSize">
          <size>
           <width>16777215</width>
-          <height>100</height>
+          <height>80</height>
          </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">background-color: rgb(141, 141, 141);</string>
+         <string notr="true">background-color: rgb(238, 238, 238);</string>
         </property>
         <property name="locale">
          <locale language="English" country="Canada"/>
@@ -799,7 +820,7 @@ PLOT</string>
         <property name="sizeHint" stdset="0">
          <size>
           <width>20</width>
-          <height>20</height>
+          <height>0</height>
          </size>
         </property>
        </spacer>
